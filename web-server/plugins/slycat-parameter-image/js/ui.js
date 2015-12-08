@@ -1472,6 +1472,8 @@ window.addEventListener('load_saved_bookmark', function (e) {
 
       //todo 
       // filters
+      // also
+      // notes
     });
 });
 
