@@ -51,6 +51,15 @@ define("slycat-parameter-image-filter-manager", ["slycat-server-root", "slycat-d
     this.controls_ready = true;
   };
 
+  FilterManager.prototype.restore_bookmark = function(bookmark) {
+    var self = this;
+    console.log("restoring bookmark in filter manager");
+
+    this.bookmark = bookmark;
+
+    
+  };
+
   FilterManager.prototype.build_sliders = function(controls_ready) {
     var self = this;
     if (!self.sliders_ready && self.controls_ready && self.table_metadata && self.table_statistics && (self.table_statistics.length == self.table_metadata["column-count"]) && self.other_columns) {
