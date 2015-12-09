@@ -1470,6 +1470,34 @@ window.addEventListener('load_saved_bookmark', function (e) {
       $("#controls").controls("option", "open_images", open_images);
       $("#scatterplot").scatterplot("set_pins", open_images);
 
+      // Filters
+      // do we really need to do all this, or can we just set_bookmark and build_sliders?
+      // filter_manager = new FilterManager(model_id, bookmarker, layout, input_columns, output_columns, image_columns, rating_columns, category_columns);
+      // // todo, this is reapeateed above, so make into a function.
+      // if(filter_manager.active_filters_ready())
+      // {
+      //   active_filters_ready();
+      // }
+      // else
+      // {
+      //   filter_manager.active_filters_ready.subscribe(function(newValue) {
+      //     if(newValue)
+      //     {
+      //       active_filters_ready();
+      //       // Terminating subscription
+      //       this.dispose();
+      //     }
+      //   });
+      // }
+      // // end todo
+      // filter_manager.set_table_metadata(table_metadata);
+      filter_manager.set_bookmark(bookmark);
+      // filter_manager.set_other_columns(other_columns);
+      // filter_manager.set_table_statistics(table_statistics);
+      // filter_manager.notify_controls_ready();
+      filter_manager.build_sliders();
+
+
       //todo 
       // filters
       // also
