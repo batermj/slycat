@@ -1472,7 +1472,8 @@ window.addEventListener('load_saved_bookmark', function (e) {
 
       // Filters
       // do we really need to do all this, or can we just set_bookmark and build_sliders?
-      ko.cleanNode(document.getElementById('parameter-image-plus-layout'));
+      ko.cleanNode(document.getElementById('filter-controls'));
+      ko.cleanNode(document.getElementById('sliders-pane'));
       filter_manager = new FilterManager(model_id, bookmarker, layout, input_columns, output_columns, image_columns, rating_columns, category_columns);
       // todo, this is reapeateed above, so make into a function.
       if(filter_manager.active_filters_ready())

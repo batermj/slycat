@@ -434,9 +434,16 @@ define("slycat-parameter-image-filter-manager", ["slycat-server-root", "slycat-d
 
       };
 
+      var viewModel = new ViewModel();
       ko.applyBindings(
-        new ViewModel(),
-        document.getElementById('parameter-image-plus-layout')
+        viewModel,
+        // document.getElementById('parameter-image-plus-layout')
+        document.getElementById('filter-controls')
+      );
+
+      ko.applyBindings(
+        viewModel,
+        document.getElementById('sliders-pane')
       );
 
       self.active_filters_ready(true);
