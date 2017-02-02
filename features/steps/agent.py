@@ -80,8 +80,9 @@ def step_impl(context):
 
 @then(u'the agent should return a path not found error')
 def step_impl(context):
-  nose.tools.assert_equal(json.loads(context.agent.stdout.readline()), {"ok": False, "message": "Path not found."})
-
+  message = json.loads(context.agent.stdout.readline())
+  nose.tools.assert_equal(message["message"], u"Path not found.")
+  nose.tools.assert_equal(message["ok"], False)
 @when(u'browsing a directory')
 def step_impl(context):
   context.agent.stdin.write("%s\n" % json.dumps({"action":"browse", "path":data_dir}))
@@ -195,6 +196,10 @@ def step_impl(context):
 @then(u'the agent should return an access denied error')
 def step_impl(context):
   nose.tools.assert_equal(json.loads(context.agent.stdout.readline()), {"ok": False, "message": "Access denied."})
+
+@then(u'the agent should return a no read permission error')
+def step_impl(context):
+  nose.tools.assert_equal(json.loads(context.agent.stdout.readline()), {"ok": False, "message": "No read permission."})
 
 @then(u'the agent should return the csv file')
 def step_impl(context):
@@ -327,7 +332,8 @@ def step_impl(context, type):
     if metadata["message"] == "Not ready.":
       time.sleep(0.1)
       continue
-
+    print(metadata["message"])
+    print(metadata["ok"])
     nose.tools.assert_equal(metadata, {"ready": True, "ok": True, "message":"Video ready."})
     break
 

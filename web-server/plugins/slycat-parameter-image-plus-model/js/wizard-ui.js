@@ -1,4 +1,4 @@
-define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", "knockout-mapping", "slycat-remote-browser"], function(server_root, client, dialog, ko, mapping)
+define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-markings", "knockout", "knockout-mapping", "slycat_file_uploader_factory"], function(server_root, client, dialog, markings, ko, mapping, fileUploader)
 {
   function constructor(params)
   {
@@ -7,13 +7,13 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
     component.project = params.projects()[0];
     component.cluster_linkage = ko.observable("average"); // average is selected by default...
     component.cluster_column = ko.observable(false);
+    component.image_columns_names = ko.observableArray();
     component.ps_type = ko.observable("remote"); // local is selected by default...
-    component.is_compute = ko.observable("no_compute");
-    component.matrix_type = ko.observable("remote"); // local is selected by default...
-    component.model = mapping.fromJS({_id: null, name: "New Parameter Image Plus Model", description: "", marking: null});
-    component.remote = mapping.fromJS({hostname: null, username: null, password: null, status: null, status_type: null, enable: ko.computed(function(){return component.ps_type() == 'remote' ? true : false;}), focus: false, sid: null});
+    component.matrix_type = ko.observable("remote"); // remote is selected by default...
+    component.model = mapping.fromJS({_id: null, name: "New Parameter Image Model", description: "", marking: markings.preselected()});
+    component.remote = mapping.fromJS({hostname: null, username: null, password: null, status: null, status_type: null, enable: ko.computed(function(){return component.ps_type() == 'remote' ? true : false;}), focus: false, sid: null, session_exists: false});
     component.remote.focus.extend({notify: "always"});
-    component.remote_matrix = mapping.fromJS({hostname: null, username: null, password: null, status: null, status_type: null, enable: ko.computed(function(){return component.matrix_type() == 'remote' ? true : false;}), focus: false, sid: null});
+    component.remote_matrix = mapping.fromJS({hostname: null, username: null, password: null, status: null, status_type: null, enable: ko.computed(function(){return component.matrix_type() == 'remote' ? true : false;}), focus: false, sid: null, session_exists: false});
     component.remote_matrix.focus.extend({notify: "always"});
     component.browser = mapping.fromJS({path:null, selection: []});
     component.parser = ko.observable(null);
@@ -24,20 +24,26 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       });
     });
     component.image_attributes.subscribe(function(newValue){
-      if(this.target().length > 0)
-      {
+      if(this.target().length > 0) {
         component.cluster_column( this.target()[0].name() );
+        this.target().forEach(function(t) {
+          component.image_columns_names.push(t.name());
+        });
       }
     });
     component.server_root = server_root;
+    component.distance_measures = ko.observableArray([
+      { name: 'Correlation Distance', value: 'correlation-distance' },
+      { name: 'Jaccard Distance', value: 'jaccard-distance' },
+      { name: 'Jaccard Distance (2)', value: 'jaccard2-distance' },
+      { name: 'One-Norm Distance', value: 'one-norm-distance' },
+      { name: 'Cosine Distance', value: 'cosine-distance' },
+      { name: 'Hamming Distance', value: 'hamming-distance' }
+    ]);
+    component.distance_measure = ko.observable('correlation-distance');
 
-    component.cancel = function() {
-      if(component.remote.sid())
-        client.delete_remote({ sid: component.remote.sid() });
-
-      if(component.model._id())
-        client.delete_model({ mid: component.model._id() });
-    };
+    // Let's use a large dialog for this wizard because there are so many steps
+    $(".modal-dialog").addClass("modal-lg");
 
     component.create_model = function() {
       client.post_project_models({
@@ -48,19 +54,18 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
         marking: component.model.marking(),
         success: function(mid) {
           component.model._id(mid);
-          client.put_model_parameter({
-            mid: component.model._id(),
-            aid: "cluster-linkage",
-            value: component.cluster_linkage(),
-            input: true,
-            success: function() {
-              component.tab(1);
-              component.remote.focus(true);
-            }
-          });
+          component.remote.focus(true);
         },
         error: dialog.ajax_error("Error creating model."),
       });
+    };
+
+    // Create a model as soon as the dialog loads. We rename, change description and marking later.
+    component.create_model();
+
+    component.cancel = function() {
+      if(component.model._id())
+        client.delete_model({ mid: component.model._id() });
     };
 
     component.select_type = function() {
@@ -70,8 +75,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       if (type === "local") {
         component.upload_table();
       } else if (type === "remote") {
-        $(".modal-dialog").addClass("modal-lg");
-        $(".ps-tab-remote-data").css("display", "block");
         component.connect();
       }
     };
@@ -80,11 +83,13 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       $('.local-browser-continue-matrix').toggleClass("disabled", true);
       var type = component.matrix_type();
 
-      if (type === "local") {
+      if (type == "compute") {
+        component.tab(4);
+        $('.browser-continue').toggleClass("disabled", false);
+      }
+      else if (type === "local") {
         component.upload_distance_matrix();
       } else if (type === "remote") {
-        $(".modal-dialog").addClass("modal-lg");
-        $(".ps-tab-remote-matrix").css("display", "block");
         component.connect_matrix();
       }
     };
@@ -115,14 +120,16 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
                   Editable: false,
                   hidden: media_columns.indexOf(i) !== -1,
                   selected: false,
-                  lastSelected: false
+                  lastSelected: false,
+                  disabled: false,
+                  tooltip: ""
                 });
               }
               // find the first image column and set its name to component.cluster_column
-              component.cluster_column
+              // component.cluster_column
 
               mapping.fromJS(attributes, component.attributes);
-              component.tab(3);
+              component.tab(2);
               $('.browser-continue').toggleClass("disabled", false);
             }
           });
@@ -132,30 +139,49 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
 
     component.upload_table = function() {
       //$('.local-browser-continue').toggleClass("disabled", true);
-      client.post_model_files({
-        mid: component.model._id(),
-        files: component.browser.selection(),
-        input: true,
-        aids: ["data-table"],
-        parser: component.parser(),
-        success: upload_success,
-        error: function(){
+      //TODO: add logic to the file uploader to look for multiple files list to add
+      var file = component.browser.selection()[0];
+      var fileObject ={
+       pid: component.project._id(),
+       mid: component.model._id(),
+       file: file,
+       aids: ["data-table"],
+       parser: component.parser(),
+       success: function(){
+         upload_success();
+       },
+       error: function(){
           dialog.ajax_error("Did you choose the correct file and filetype?  There was a problem parsing the file: ")();
-          $('.local-browser-continue').toggleClass("disabled", false);
-        },
-      });
+          $('.browser-continue').toggleClass("disabled", false);
+        }
+      };
+      fileUploader.uploadFile(fileObject);
     };
 
     component.select_columns = function() {
-      if (component.ps_type() === "remote") {
-        $('.ps-tab-compute-matrix').css('display', 'block');
-        component.tab(4);
-      } else
-        component.tab(5);
+      component.put_model_parameters();
+      component.tab(3);
+
+      // if (component.ps_type() === "remote") {
+      //   component.tab(3);
+      // } else {
+      //   component.tab(4);
+      // }
+    };
+
+    component.select_distance_measure = function() {
+      component.distance_measure($('#distance_measure').val());
+      component.tab(5);
     };
 
     component.select_compute = function() {
-      component.tab(5);
+      var vm = ko.dataFor($('.slycat-remote-interface')[0]);
+      vm.agent_function(component.distance_measure());
+      vm.submit_job();
+    };
+
+    component.to_last_step = function() {
+      component.tab(7);
     };
 
     var upload_matrix_success = function() {
@@ -196,94 +222,132 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
 
     component.upload_distance_matrix = function() {
       //$('.local-browser-continue').toggleClass("disabled", true);
-      client.post_model_files({
-        mid: component.model._id(),
-        files: component.browser.selection(),
-        input: true,
-        aids: ["distance-matrix"],
-        parser: "slycat-csv-parser",
-        success: upload_matrix_success,
-        error: function(){
+      var file = component.browser.selection()[0];
+      var fileObject ={
+       pid: component.project._id(),
+       mid: component.model._id(),
+       file: file,
+       aids: ["distance-matrix"],
+       parser: "slycat-csv-parser",
+       success: function(){
+         upload_matrix_success();
+       },
+       error: function(){
           dialog.ajax_error("Did you choose the correct file and filetype?  There was a problem parsing the file: ")();
-          $('.local-browser-continue').toggleClass("disabled", false);
-        },
-      });
+          $('.browser-continue').toggleClass("disabled", false);
+        }
+      };
+      fileUploader.uploadFile(fileObject);
     };
 
     component.connect = function() {
       component.remote.status_type("info");
       component.remote.status("Connecting ...");
-      client.post_remotes({
-        hostname: component.remote.hostname(),
-        username: component.remote.username(),
-        password: component.remote.password(),
-        success: function(sid) {
-          component.remote.sid(sid);
-          component.tab(2);
-        },
-        error: function(request, status, reason_phrase) {
-          component.remote.status_type("danger");
-          component.remote.status(reason_phrase);
-          component.remote.focus("password");
-        }
-      });
+
+      if(component.remote.session_exists())
+      {
+        component.tab(1);
+        $('.browser-continue').toggleClass("disabled", false);
+        component.remote.status_type(null);
+        component.remote.status(null);
+      }
+      else
+      {
+        client.post_remotes({
+          hostname: component.remote.hostname(),
+          username: component.remote.username(),
+          password: component.remote.password(),
+          success: function(sid) {
+            component.remote.session_exists(true);
+            component.remote.sid(sid);
+            component.tab(1);
+            $('.browser-continue').toggleClass("disabled", false);
+            component.remote.status_type(null);
+            component.remote.status(null);
+          },
+          error: function(request, status, reason_phrase) {
+            component.remote.status_type("danger");
+            component.remote.status(reason_phrase);
+            component.remote.focus("password");
+            $('.browser-continue').toggleClass("disabled", false);
+          }
+        });
+      }
     };
 
     component.connect_matrix = function() {
       component.remote_matrix.status_type("info");
       component.remote_matrix.status("Connecting ...");
-      client.post_remotes({
-        hostname: component.remote_matrix.hostname(),
-        username: component.remote_matrix.username(),
-        password: component.remote_matrix.password(),
-        success: function(sid) {
-          component.remote_matrix.sid(sid);
-          component.tab(6);
-        },
-        error: function(request, status, reason_phrase) {
-          component.remote_matrix.status_type("danger");
-          component.remote_matrix.status(reason_phrase);
-          component.remote_matrix.focus("password");
-        }
-      });
+
+      if(component.remote.session_exists())
+      {
+        component.tab(6);
+        $('.browser-continue').toggleClass("disabled", false);
+        component.remote_matrix.status_type(null);
+        component.remote_matrix.status(null);
+      }
+      else
+      {
+        client.post_remotes({
+          hostname: component.remote_matrix.hostname(),
+          username: component.remote_matrix.username(),
+          password: component.remote_matrix.password(),
+          success: function(sid) {
+            component.remote_matrix.session_exists(true);
+            component.remote_matrix.sid(sid);
+            component.tab(6);
+            $('.browser-continue').toggleClass("disabled", false);
+            component.remote_matrix.status_type(null);
+            component.remote_matrix.status(null);
+          },
+          error: function(request, status, reason_phrase) {
+            component.remote_matrix.status_type("danger");
+            component.remote_matrix.status(reason_phrase);
+            component.remote_matrix.focus("password");
+            $('.browser-continue').toggleClass("disabled", false);
+          }
+        });
+      }
     };
 
     component.load_table = function() {
       $('.remote-browser-continue-data').toggleClass("disabled", true);
-      client.post_model_files({
-        mid: component.model._id(),
-        sids: [component.remote.sid()],
-        paths: component.browser.selection(),
-        input: true,
-        aids: ["data-table"],
-        parser: component.parser(),
-        success: function(){
-          upload_success();
-        },
-        error: function(){
+      var fileObject ={
+       pid: component.project._id(),
+       hostname: [component.remote.hostname()],
+       mid: component.model._id(),
+       paths: [component.browser.selection()],
+       aids: ["data-table"],
+       parser: component.parser(),
+       success: function(){
+         upload_success();
+       },
+       error: function(){
           dialog.ajax_error("Did you choose the correct file and filetype?  There was a problem parsing the file: ")();
-          $('.remote-browser-continue').toggleClass("disabled", false);
-        },
-      });
+          $('.browser-continue').toggleClass("disabled", false);
+        }
+      };
+      fileUploader.uploadFile(fileObject);
     };
 
     component.load_distance_matrix = function() {
       $('.remote-browser-continue-matrix').toggleClass("disabled", true);
-      client.post_model_files({
-        mid: component.model._id(),
-        sids: [component.remote_matrix.sid()],
-        paths: component.browser.selection(),
-        input: true,
-        aids: ["distance-matrix"],
-        parser: "slycat-csv-parser",
-        success: function(){
-          upload_matrix_success();
-        },
-        error: function(){
+      var fileObject ={
+       pid: component.project._id(),
+       hostname: [component.remote.hostname()],
+       mid: component.model._id(),
+       paths: [component.browser.selection()],
+       aids: ["distance-matrix"],
+       parser: "slycat-csv-parser",
+       success: function(){
+         upload_matrix_success();
+       },
+       error: function(){
           dialog.ajax_error("Did you choose the correct file and filetype?  There was a problem parsing the file: ")();
-          $('.remote-browser-continue').toggleClass("disabled", false);
-        },
-      });
+          $('.browser-continue').toggleClass("disabled", false);
+        }
+      };
+      fileUploader.uploadFile(fileObject);
     };
 
     component.set_input = function(attribute) {
@@ -330,8 +394,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       location = server_root + 'models/' + component.model._id();
     };
 
-    component.finish = function() {
-      component.tab(7);
+    component.put_model_parameters = function(callback) {
       var input_columns = [];
       var output_columns = [];
       var rating_columns = [];
@@ -396,14 +459,18 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
                             success: function() {
                               client.put_model_parameter({
                                 mid: component.model._id(),
-                                aid: "cluster-measure",
-                                value: 'csv',
+                                aid: "default-image",
+                                value: component.image_columns_names.indexOf(component.cluster_column()),
                                 input: true,
                                 success: function() {
-                                  client.post_model_finish({
+                                  client.put_model_parameter({
                                     mid: component.model._id(),
+                                    aid: "cluster-measure",
+                                    value: 'csv',
+                                    input: true,
                                     success: function() {
-                                      component.tab(7);
+                                      if (callback)
+                                        callback();
                                     }
                                   });
                                 }
@@ -420,6 +487,111 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
           });
         }
       });
+    };
+
+    component.finish = function() {
+      component.tab(7);
+      $('.browser-continue').toggleClass("disabled", false);
+    };
+
+    component.name_model = function() {
+      client.put_model(
+      {
+        mid: component.model._id(),
+        name: component.model.name(),
+        description: component.model.description(),
+        marking: component.model.marking(),
+        success: function()
+        {
+          client.put_model_parameter({
+            mid: component.model._id(),
+            aid: "cluster-linkage",
+            value: component.cluster_linkage(),
+            input: true,
+            success: function() {
+              if (component.matrix_type() === "compute")
+                component.go_to_model();
+              else {
+                client.post_model_finish({
+                  mid: component.model._id(),
+                  success: function() {
+                    component.go_to_model();
+                  }
+                });
+              }
+            }
+          });
+        },
+        error: dialog.ajax_error("Error updating model."),
+      });
+    };
+
+    component.back = function() {
+      var target = component.tab();
+
+      // Ask user if they want to cancel their compute job
+      if(component.tab() == 7 && component.matrix_type() == 'compute')
+      {
+        dialog.confirm({
+          title: 'Stop Computing Distances?',
+          message: 'To go back, you need to stop the compute distances job. Do you want to stop this job and go back?',
+          ok: function(){
+            // Stop the compute job
+            var contextData = ko.contextFor(document.getElementsByClassName('slycat-remote-interface')[0]).$data;
+            var sid = contextData.remote.sid();
+            var jid = contextData.jid();
+            if(jid > -1 && sid !== null)
+            {
+              client.post_cancel_job({
+                sid: sid,
+                jid: jid,
+                success: function(){
+                  go_back();
+                },
+                error: function(){
+                  go_back();
+                }
+              });
+            }
+            else
+            {
+              go_back();
+            }
+          },
+          cancel: function(){
+            return;
+          }
+        });
+
+        function go_back(){
+          target--;
+          target--;
+          component.tab(target);
+        }
+      }
+      else
+      {
+        // Skip Select Table tabs if we are local
+        if(component.tab() == 2 && component.ps_type() == 'local')
+        {
+          target--;
+        }
+        // Skip Compute Distances tab if we are on Select Distances tab
+        else if(component.tab() == 6)
+        {
+          target--;
+          target--;
+        }
+        // Skip Select Distances and Compute Distances tabs if we are doing local matrix
+        else if(component.tab() == 7 && component.matrix_type() == 'local')
+        {
+          target--;
+          target--;
+          target--;
+        }
+        target--;
+        component.tab(target);
+      }
     };
 
     return component;

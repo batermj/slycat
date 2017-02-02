@@ -4,8 +4,10 @@ DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains certain
 rights in this software.
 */
 
-define("slycat-parameter-image-plus-model", ["slycat-server-root", "slycat-web-client", "slycat-bookmark-manager", "slycat-dialog", "d3", "URI", "domReady!"], function(server_root, client, bookmark_manager, dialog, d3, URI)
+define("slycat-parameter-image-plus-model", ["slycat-server-root", "slycat-web-client", "slycat-bookmark-manager", "slycat-dialog", "knockout", "d3", "URI", "domReady!"], function(server_root, client, bookmark_manager, dialog, ko, d3, URI)
 {
+  ko.applyBindings({}, document.getElementsByClassName('slycat-content')[0]);
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // Setup global variables.
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -50,14 +52,13 @@ var cluster_ready = false;
 
 var image_uri = document.createElement("a");
 var grid_pane = "#parameter-image-plus-layout";
-// session_cache and image_cache need to be shared between dendrogram and scatterplot, thus they are passed inside an array to keep them in sync.
+// image_cache needs to be shared between dendrogram and scatterplot, thus it is passed inside an array to keep it in sync.
 // http://api.jqueryui.com/jquery.widget/
-// All options passed on init are deep-copied to ensure the objects can be modified later without affecting the widget. 
-// Arrays are the only exception, they are referenced as-is. 
+// All options passed on init are deep-copied to ensure the objects can be modified later without affecting the widget.
+// Arrays are the only exception, they are referenced as-is.
 // This exception is in place to support data-binding, where the data source has to be kept as a reference.
-var session_cache = {};
 var image_cache = {};
-var cache_references = [ session_cache, image_cache ];
+var cache_references = [ image_cache ];
 
 var login_dialog = $("#remote-login-dialog");
 
@@ -85,9 +86,9 @@ login_dialog.dialog({
 });
 
 // Enter key in password field triggers click on Login button
-$("#remote-password", login_dialog).keypress(function(event){ 
-  if(event.keyCode == 13) 
-  { 
+$("#remote-password", login_dialog).keypress(function(event){
+  if(event.keyCode == 13)
+  {
     $('.ui-dialog-buttonset', login_dialog.parent()).find('button:contains(Login)').trigger('click');
   }
 });
@@ -101,19 +102,19 @@ $("#parameter-image-plus-layout").layout(
   center:
   {
     // resizeWhileDragging: false,
-    // onresize: function() { 
+    // onresize: function() {
     //   $("#scatterplot").scatterplot("option", {
-    //     width: $("#scatterplot-pane").width(), 
+    //     width: $("#scatterplot-pane").width(),
     //     height: $("#scatterplot-pane").height()
-    //   }); 
+    //   });
     // },
   },
   west:
   {
     size: $("#parameter-image-plus-layout").width() / 2,
     resizeWhileDragging : false,
-    onresize: function() 
-    { 
+    onresize: function()
+    {
       $("#dendrogram-viewer").dendrogram("resize_canvas");
     }
   },
@@ -134,11 +135,11 @@ $("#model-pane").layout(
   center:
   {
     resizeWhileDragging: false,
-    onresize: function() { 
+    onresize: function() {
       $("#scatterplot").scatterplot("option", {
-        width: $("#scatterplot-pane").width(), 
+        width: $("#scatterplot-pane").width(),
         height: $("#scatterplot-pane").height()
-      }); 
+      });
     },
   }
 });
@@ -160,6 +161,11 @@ $.ajax(
     image_columns = model["artifact:image-columns"];
     rating_columns = model["artifact:rating-columns"] == undefined ? [] : model["artifact:rating-columns"];
     category_columns = model["artifact:category-columns"] == undefined ? [] : model["artifact:category-columns"];
+    default_image = model["artifact:default-image"];
+
+    if (default_image === null || default_image === undefined)
+      default_image = 0;
+
     model_loaded();
   },
   error: function(request, status, reason_phrase)
@@ -172,11 +178,25 @@ $.ajax(
 // Once the model has been loaded, retrieve metadata / bookmarked state
 //////////////////////////////////////////////////////////////////////////////////////////
 
+var show_checkjob = function() {
+  var jc = $('#parameter-image-plus-layout').children()[0];
+  var $jc = $(jc);
+  $jc.detach();
+
+  $($('#parameter-image-plus-layout').children()).remove();
+  $('#parameter-image-plus-layout').append($jc);
+
+  var vm = ko.dataFor($('.slycat-job-checker')[0]);
+  vm.set_jid(model['artifact:jid']);
+};
+
 function model_loaded()
 {
   // If the model isn't ready or failed, we're done.
-  if(model["state"] == "waiting" || model["state"] == "running")
+  if(model["state"] == "waiting" || model["state"] == "running") {
+    show_checkjob();
     return;
+  }
   if(model["state"] == "closed" && model["result"] === null)
     return;
   if(model["result"] == "failed")
@@ -189,8 +209,7 @@ function model_loaded()
   $.ajax({
     url : server_root + "models/" + model_id + "/files/clusters",
     contentType : "application/json",
-    success: function(result)
-    {
+    success: function(result) {
       clusters = result;
       clusters_data = new Array(clusters.length);
       retrieve_current_cluster();
@@ -204,8 +223,7 @@ function model_loaded()
   $.ajax({
     url : server_root + "models/" + model_id + "/tables/data-table/arrays/0/metadata?index=Index",
     contentType : "application/json",
-    success: function(metadata)
-    {
+    success: function(metadata) {
       table_metadata = metadata;
       table_statistics = new Array(metadata["column-count"]);
       table_statistics[metadata["column-count"]-1] = {"max": metadata["row-count"]-1, "min": 0};
@@ -246,7 +264,7 @@ function build_dendrogram_node_options(cluster_index)
   var dendrogram_options = {
     cluster: cluster_index,
   };
-  
+
   dendrogram_options.collapsed_nodes = bookmark[cluster_index  + "-collapsed-nodes"];
   dendrogram_options.expanded_nodes = bookmark[cluster_index  + "-expanded-nodes"];
   dendrogram_options.selected_nodes = bookmark[cluster_index  + "-selected-nodes"];
@@ -341,6 +359,10 @@ function metadata_loaded()
       success : function(result)
       {
         x = result;
+        if(table_metadata["column-types"][x_index]=="string")
+        {
+          x = x[0];
+        }
         setup_scatterplot();
         setup_table();
       },
@@ -356,6 +378,10 @@ function metadata_loaded()
       success : function(result)
       {
         y = result;
+        if(table_metadata["column-types"][y_index]=="string")
+        {
+          y = y[0];
+        }
         setup_scatterplot();
         setup_table();
       },
@@ -388,6 +414,10 @@ function metadata_loaded()
         success : function(result)
         {
           v = result;
+          if(table_metadata["column-types"][v_index]=="string")
+          {
+            v = v[0];
+          }
           update_current_colorscale();
           setup_scatterplot();
           setup_table();
@@ -397,7 +427,7 @@ function metadata_loaded()
       });
     }
 
-    images_index = image_columns[0];
+    images_index = image_columns[default_image];
     if("images-selection" in bookmark)
       images_index = bookmark["images-selection"];
     setup_table();
@@ -429,7 +459,7 @@ function metadata_loaded()
 
 function setup_dendrogram()
 {
-  if(!dendrogram_ready && bookmark && clusters != null && cluster_index != null && clusters_data != null 
+  if(!dendrogram_ready && bookmark && clusters != null && cluster_index != null && clusters_data != null
     && clusters_data[cluster_index] !== undefined && colorscale && v && selected_simulations != null
     && images !== null
     )
@@ -520,7 +550,7 @@ function setup_dendrogram()
 function setup_table()
 {
   if( !table_ready && table_metadata && (table_statistics.length == table_metadata["column-count"]) && colorscale
-    && bookmark && (x_index != null) && (y_index != null) && (images_index !== null) 
+    && bookmark && (x_index != null) && (y_index != null) && (images_index !== null)
     && (selected_simulations != null) && (hidden_simulations != null) )
   {
     table_ready = true;
@@ -530,7 +560,7 @@ function setup_table()
     var other_columns = [];
     for(var i = 0; i != table_metadata["column-count"] - 1; ++i)
     {
-      if($.inArray(i, input_columns) == -1 && $.inArray(i, output_columns) == -1 
+      if($.inArray(i, input_columns) == -1 && $.inArray(i, output_columns) == -1
         && $.inArray(i, rating_columns) == -1 && $.inArray(i, category_columns) == -1)
         other_columns.push(i);
     }
@@ -650,7 +680,7 @@ function setup_table()
     {
       // Changing the color variable updates the table ...
       $("#table").table("option", "variable-selection", [Number(variable)]);
-      
+
       // Handle changes to the color variable ...
       handle_color_variable_change(variable);
     });
@@ -747,7 +777,7 @@ function setup_scatterplot()
 
 function setup_controls()
 {
-  if( !controls_ready && table_metadata && (image_columns !== null) && (rating_columns != null) 
+  if( !controls_ready && table_metadata && (image_columns !== null) && (rating_columns != null)
     && (category_columns != null) && (x_index != null) && (y_index != null) && auto_scale != null
     && (images_index !== null) && (selected_simulations != null) && (hidden_simulations != null)
     && indices
@@ -966,7 +996,7 @@ function selected_node_changed(parameters)
       url : server_root + "events/models/" + model_id + "/select/node/" + parameters.node["node-index"]
     });
   }
-  if(parameters.skip_bookmarking != true) 
+  if(parameters.skip_bookmarking != true)
   {
     var state = {};
     state[ cluster_index + "-selected-nodes" ] = getNodeIndexes(parameters.selection, "node-index");
@@ -1111,6 +1141,10 @@ function update_v(variable)
     success : function(result)
     {
       v = result;
+      if(table_metadata["column-types"][variable]=="string")
+      {
+        v = v[0];
+      }
       update_widgets_after_color_variable_change();
     },
     error : artifact_missing
@@ -1121,7 +1155,11 @@ function update_widgets_after_color_variable_change()
 {
   update_current_colorscale();
   $("#table").table("option", "colorscale", colorscale);
-  $("#scatterplot").scatterplot("update_color_scale_and_v", {v : v, v_string : table_metadata["column-types"][v_index]=="string", colorscale : colorscale});
+  $("#scatterplot").scatterplot("update_color_scale_and_v", {
+    v : v,
+    v_string : table_metadata["column-types"][v_index]=="string",
+    colorscale : colorscale
+  });
   $("#scatterplot").scatterplot("option", "v_label", table_metadata["column-names"][v_index]);
   $("#dendrogram-viewer").dendrogram("option", "color-options", {color_array : v, colorscale : colorscale});
 }
@@ -1336,7 +1374,11 @@ function update_scatterplot_x(variable)
     attribute : variable,
     success : function(result)
     {
-      $("#scatterplot").scatterplot("option", {x_string: table_metadata["column-types"][variable]=="string", x: result, x_label:table_metadata["column-names"][variable]});
+      $("#scatterplot").scatterplot("option", {
+        x_string: table_metadata["column-types"][variable]=="string",
+        x: table_metadata["column-types"][variable]=="string" ? result[0] : result,
+        x_label:table_metadata["column-names"][variable]
+      });
     },
     error : artifact_missing
   });
@@ -1352,7 +1394,11 @@ function update_scatterplot_y(variable)
     attribute : variable,
     success : function(result)
     {
-      $("#scatterplot").scatterplot("option", {y_string: table_metadata["column-types"][variable]=="string", y: result, y_label:table_metadata["column-names"][variable]});
+      $("#scatterplot").scatterplot("option", {
+        y_string: table_metadata["column-types"][variable]=="string",
+        y: table_metadata["column-types"][variable]=="string" ? result[0] : result,
+        y_label:table_metadata["column-names"][variable]
+      });
     },
     error : artifact_missing
   });

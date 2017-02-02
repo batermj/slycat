@@ -15,6 +15,7 @@ import couchdb.client
 import threading
 import time
 import uuid
+import slycat.email
 
 class Database:
   """Wraps a :class:`couchdb.client.Database` to convert CouchDB exceptions into CherryPy exceptions."""
@@ -40,6 +41,7 @@ class Database:
     try:
       return self._database.save(*arguments, **keywords)
     except couchdb.http.ServerError as e:
+      slycat.email.send_error("slycat.web.server.database.couchdb.py save", "%s %s" % (e.message[0], e.message[1][1]))
       raise cherrypy.HTTPError("%s %s" % (e.message[0], e.message[1][1]))
 
   def view(self, *arguments, **keywords):
@@ -56,6 +58,7 @@ class Database:
     except couchdb.client.http.ResourceNotFound:
       raise cherrypy.HTTPError(404)
     if document["type"] != type:
+      slycat.email.send_error("slycat.web.server.database.couchdb.py get", "cherrypy.HTTPError 404 document type %s is different than input type: %s" % (document["type"], type))
       raise cherrypy.HTTPError(404)
     return document
 
@@ -63,6 +66,13 @@ class Database:
     fid = uuid.uuid4().hex
     self.put_attachment(document, content, filename=fid, content_type=content_type)
     return fid
+
+  def __repr__(self):
+    """
+    adding this so we can use the cache decorator
+    :return:
+    """
+    return "<slycat.web.server.database.couchdb.Database instance>"
 
 def connect():
   """Connect to a CouchDB database.

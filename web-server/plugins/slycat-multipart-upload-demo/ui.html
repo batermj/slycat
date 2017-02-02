@@ -4,10 +4,14 @@
     <input type="file" id="file"></input>
     <button class="btn btn-default" id="upload">Upload</button>
   </div>
-
+  <script type="text/javascript" src="file_uploader_factory.js"></script>
   <script type="text/javascript">
-    require(["slycat-web-client"], function(client)
+    require(["slycat-web-client", "slycat_file_uploader_factory"], function(client, fileUploader)
     {
+      //console.log("check library factory loader :"+ fileUploader.MEGABYTE);
+      /**
+       * create a cca project for the cars.csv file
+       */
       function create_project()
       {
         client.post_projects({
@@ -19,7 +23,9 @@
           }
         });
       }
-
+      /**
+       * create a model within a project
+       */
       function create_model(pid)
       {
         client.post_project_models({
@@ -29,95 +35,44 @@
           success: function(mid)
           {
             console.log("Model created.");
-            start_upload(pid, mid);
+             /*   fileobject
+             *    {
+             *      pid: project id
+             *      mid: model id
+             *      file: file to be uploaded
+             *      parser: parser to be used for uploading
+             *      success: function called if upload is successful
+             *    }
+             */
+            var file = document.getElementById("file").files[0];
+            console.log("Upload file"+ file + " \nfile size:" + file.size);
+            console.log("floor size" + Math.floor(file.size / fileUploader.MEGABYTE));
+            var fileObject ={
+             pid: pid,
+             mid: mid,
+             file: file,
+             aids: ["data-table"],
+             parser: "slycat-csv-parser",
+             success: function(){
+               finish_model(pid, mid);
+             }
+            };
+            fileUploader.uploadFile(fileObject);
+            //start_upload(pid, mid);
           }
         });
       }
 
-      function start_upload(pid, mid)
-      {
-        client.post_uploads({
-          mid: mid,
-          input: true,
-          parser: "slycat-csv-parser",
-          aids: ["data-table"],
-          success: function(uid)
-          {
-            console.log("Upload session created.");
-            upload_file(pid, mid, uid);
-          }
-        });
-      }
-
-      function upload_file(pid, mid, uid)
-      {
-        file = document.getElementById("file").files[0];
-        console.log("Upload file", file);
-
-        // Split the file into two halves.
-        boundary = Math.floor(file.size / 2);
-        first_part = file.slice(0, boundary);
-        second_part = file.slice(boundary, file.size);
-
-        // Upload each half separately.
-        console.log("Uploading first part", first_part);
-        client.put_upload_file_part({
-          uid: uid,
-          fid: 0,
-          pid: 0,
-          file: first_part,
-          success: function()
-          {
-            console.log("Uploading second part", second_part);
-            client.put_upload_file_part({
-              uid: uid,
-              fid: 0,
-              pid: 1,
-              file: second_part,
-              success: function()
-              {
-                console.log("File uploaded.");
-                finish_upload(pid, mid, uid);
-              }
-            });
-          }
-        });
-      }
-
-      function finish_upload(pid, mid, uid)
-      {
-        client.post_upload_finished({
-          uid: uid,
-          uploaded: [2],
-          success: function()
-          {
-            console.log("Upload session finished.");
-            delete_upload(pid, mid, uid);
-          }
-        });
-      }
-
-      function delete_upload(pid, mid, uid)
-      {
-        client.delete_upload({
-          uid: uid,
-          success: function()
-          {
-            console.log("Upload session deleted.");
-            finish_model(pid, mid);
-          },
-          error: function(request, status, reason_phrase)
-          {
-            if(request.status == 409)
-            {
-              window.setTimeout(delete_upload.bind(null, pid, mid, uid), 3000)
-            }
-          }
-        });
-      }
-
+      /**
+       * finish the cca model we just uploaded for the cars data set
+       * @param pid
+       *  project id
+       * @param mid
+       *  model id
+         */
       function finish_model(pid, mid)
       {
+        console.log("finishing model");
         client.put_model_parameter({
           mid: mid,
           aid: "input-columns",

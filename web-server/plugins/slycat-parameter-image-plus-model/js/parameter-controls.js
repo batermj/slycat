@@ -293,29 +293,18 @@ $.widget("parameter_image.controls",
   },
 
 
-  _write_data_table: function(sl)
+  _write_data_table: function(selectionList)
   {
-    var selectionList = sl || [];
     var self = this;
-    var numRows = self.options.metadata['row-count'];
-    var numCols = self.options.metadata['column-count'];
-    var rowRequest = "";
-
-    if (selectionList.length > 0) {
-      selectionList.sort(function(x,y) {return x-y});
-      rowRequest = "rows=" + selectionList.toString();
-    } else {
-      rowRequest = "rows=0-" + numRows;
-    }
-
     $.ajax(
     {
-      type : "GET",
-      url : self.options['server-root'] + "models/" + self.options.mid + "/tables/" + self.options.aid + "/arrays/0/chunk?" + rowRequest + "&columns=0-" + numCols + "&index=Index",
-      //url : self.options['server-root'] + "models/" + self.options.mid + "/tables/" + self.options.aid + "/arrays/0/chunk?rows=0-" + numRows + "&columns=0-" + numCols + "&index=Index",
+      type : "POST",
+      url : server_root + "models/" + self.options.mid + "/arraysets/" + self.options.aid + "/data",
+      data: JSON.stringify({"hyperchunks": "0/.../..."}),
+      contentType: "application/json",
       success : function(result)
       {
-        self._write_csv( self._convert_to_csv(result), self.options.model_name + "_data_table.csv" );
+        self._write_csv( self._convert_to_csv(result, selectionList), self.options.model_name + "_data_table.csv" );
       },
       error: function(request, status, reason_phrase)
       {
@@ -369,27 +358,31 @@ $.widget("parameter_image.controls",
 */
   },
 
-  _convert_to_csv: function(array)
+  _convert_to_csv: function(array, sl)
   {
-    // Note that array.data is column-major:  array.data[0][*] is the first column 
-    var numRows = array.rows.length;
-    var numCols = array.columns.length;
+    // Note that array.data is column-major:  array.data[0][*] is the first column
+    var self = this;
+    var selectionList = sl || [];
+    var numRows = array[0].length;
+    var numCols = array.length;
     var rowMajorOutput = "";
-    numCols = numCols - 1;  // skip last column which is slycat index
     var r, c;
     // add the headers
     for(c=0; c<numCols; c++) {
-      rowMajorOutput += array["column-names"][c] + ",";
+      rowMajorOutput += self.options.metadata["column-names"][c] + ",";
     }
     rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
     rowMajorOutput += "\n";
     // add the data
     for(r=0; r<numRows; r++) {
-      for(c=0; c<numCols; c++) {
-        rowMajorOutput += array.data[c][r] + ",";
+      if(selectionList.length == 0 || selectionList.indexOf(r) > -1)
+      {
+        for(c=0; c<numCols; c++) {
+          rowMajorOutput += array[c][r] + ",";
+        }
+        rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
+        rowMajorOutput += "\n";
       }
-      rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
-      rowMajorOutput += "\n";
     }
     return rowMajorOutput;
   },

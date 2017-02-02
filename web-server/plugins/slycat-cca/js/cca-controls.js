@@ -13,12 +13,29 @@ $.widget("cca.controls",
   	model_name : null,
   	aid : null,
   	metadata : null,
+    "color-variable" : null,
+    color_variables : [],
   	selection : [],
   },
 
   _create: function()
   {
   	var self = this;
+
+    this.color_control = $('<div class="btn-group btn-group-xs"></div>')
+      .appendTo(this.element)
+      ;
+    this.color_button = $('\
+      <button class="btn btn-default dropdown-toggle" type="button" id="color-dropdown" data-toggle="dropdown" aria-expanded="true" title="Change Point Color"> \
+        Point Color \
+        <span class="caret"></span> \
+      </button> \
+      ')
+      .appendTo(self.color_control)
+      ;
+    this.color_items = $('<ul id="y-axis-switcher" class="dropdown-menu" role="menu" aria-labelledby="color-dropdown">')
+      .appendTo(self.color_control)
+      ;
 
   	this.csv_button = $("\
       <button class='btn btn-default' title='Download Data Table'> \
@@ -64,31 +81,21 @@ $.widget("cca.controls",
         },
       });
     }
-
+    self._set_color_variables();
   },
 
-  _write_data_table: function(sl)
+  _write_data_table: function(selectionList)
   {
-    var selectionList = sl || [];
     var self = this;
-    var numRows = self.options.metadata['row-count'];
-    var numCols = self.options.metadata['column-count'];
-    var rowRequest = "";
-
-    if (selectionList.length > 0) {
-      selectionList.sort(function(x,y) {return x-y});
-      rowRequest = "rows=" + selectionList.toString();
-    } else {
-      rowRequest = "rows=0-" + numRows;
-    }
-
     $.ajax(
     {
-      type : "GET",
-      url : server_root + "models/" + self.options.mid + "/tables/" + self.options.aid + "/arrays/0/chunk?" + rowRequest + "&columns=0-" + numCols + "&index=Index",
+      type : "POST",
+      url : server_root + "models/" + self.options.mid + "/arraysets/" + self.options.aid + "/data",
+      data: JSON.stringify({"hyperchunks": "0/.../..."}),
+      contentType: "application/json",
       success : function(result)
       {
-        self._write_csv( self._convert_to_csv(result), self.options.model_name + "_data_table.csv" );
+        self._write_csv( self._convert_to_csv(result, selectionList), self.options.model_name + "_data_table.csv" );
       },
       error: function(request, status, reason_phrase)
       {
@@ -99,54 +106,81 @@ $.widget("cca.controls",
 
   _write_csv: function(csvData, defaultFilename)
   {
-    var self = this;
-    var D = document;
-    var a = D.createElement("a");
-    var strMimeType = "text/plain";
-    var defaultFilename = defaultFilename || "slycatDataTable.csv";
-
-    //build download link:
-    a.href = "data:" + strMimeType + ";charset=utf-8," + encodeURIComponent(csvData);  //encodeURIComponent() handles all special chars
-
-    if ('download' in a) { //FF20, CH19
-      a.setAttribute("download", defaultFilename);
-      a.innerHTML = "downloading...";
-      D.body.appendChild(a);
-      setTimeout(function() {
-        var e = D.createEvent("MouseEvent");
-	e.initMouseEvent("click", true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-	a.dispatchEvent(e);
-	D.body.removeChild(a);
-      }, 66);
-      return true;
-    } else {   // end if('download' in a)
-      console.log("++ firefox/chrome detect failed");
-    }
+    var blob = new Blob([ csvData ], {
+      type : "application/csv;charset=utf-8;"
+    });
+    var csvUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = csvUrl;
+    link.style = "visibility:hidden";
+    link.download = defaultFilename || "slycatDataTable.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 
-  _convert_to_csv: function(array)
+  _convert_to_csv: function(array, sl)
   {
     // Note that array.data is column-major:  array.data[0][*] is the first column
-    var numRows = array.rows.length;
-    var numCols = array.columns.length;
+    var self = this;
+    var selectionList = sl || [];
+    var numRows = array[0].length;
+    var numCols = array.length;
     var rowMajorOutput = "";
-    numCols = numCols - 1;  // skip last column which is slycat index
     var r, c;
     // add the headers
     for(c=0; c<numCols; c++) {
-      rowMajorOutput += array["column-names"][c] + ",";
+      rowMajorOutput += self.options.metadata["column-names"][c] + ",";
     }
     rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
     rowMajorOutput += "\n";
     // add the data
     for(r=0; r<numRows; r++) {
-      for(c=0; c<numCols; c++) {
-        rowMajorOutput += array.data[c][r] + ",";
+      if(selectionList.length == 0 || selectionList.indexOf(r) > -1)
+      {
+        for(c=0; c<numCols; c++) {
+          rowMajorOutput += array[c][r] + ",";
+        }
+        rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
+        rowMajorOutput += "\n";
       }
-      rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
-      rowMajorOutput += "\n";
     }
     return rowMajorOutput;
+  },
+
+  _set_color_variables: function()
+  {
+    var self = this;
+    this.color_items.empty();
+    for(var i = 0; i < this.options.color_variables.length; i++) {
+      $("<li role='presentation'>")
+        .toggleClass("active", self.options["color-variable"] == self.options.color_variables[i])
+        .attr("data-colorvariable", this.options.color_variables[i])
+        .appendTo(self.color_items)
+        .append(
+          $('<a role="menuitem" tabindex="-1">')
+            .html(this.options.metadata['column-names'][this.options.color_variables[i]])
+            .click(function()
+            {
+              var menu_item = $(this).parent();
+              if(menu_item.hasClass("active"))
+                return false;
+
+              self.color_items.find("li").removeClass("active");
+              menu_item.addClass("active");
+
+              self.element.trigger("color-selection-changed", menu_item.attr("data-colorvariable"));
+            })
+        )
+        ;
+    }
+  },
+
+  _set_selected_color: function()
+  {
+    var self = this;
+    self.color_items.find("li").removeClass("active");
+    self.color_items.find('li[data-colorvariable="' + self.options["color-variable"] + '"]').addClass("active");
   },
 
   _setOption: function(key, value)
@@ -155,6 +189,15 @@ $.widget("cca.controls",
 
     //console.log("sparameter_image.variableswitcher._setOption()", key, value);
     this.options[key] = value;
+
+    if(key == "color-variable")
+    {
+      self._set_selected_color();
+    }
+    else if(key == 'color_variables')
+    {
+      self._set_color_variables();
+    }
   },
 
 });

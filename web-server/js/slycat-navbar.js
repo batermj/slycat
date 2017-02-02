@@ -4,14 +4,43 @@ DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains certain
 rights in this software.
 */
 
-define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-changes-feed", "slycat-dialog", "knockout", "knockout-mapping"], function(server_root, client, changes_feed, dialog, ko, mapping)
+define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-changes-feed", "slycat-dialog", "slycat-model-names", "knockout", "knockout-mapping"], function(server_root, client, changes_feed, dialog, model_names, ko, mapping)
 {
   ko.components.register("slycat-navbar",
   {
     viewModel: function(params)
     {
+      var refreshTimer = setInterval(checkCookie,60000)
+
+      function checkCookie(){
+        var myCookie = getCookie("slycattimeout");
+        if(myCookie == null){
+            window.location.href = "/login/slycat-login.html?from=" + window.location.href;
+        }
+      }
+
+      function getCookie(name) {
+        var dc = document.cookie;
+        var prefix = name + "=";
+        var begin = dc.indexOf("; " + prefix);
+        if (begin == -1) {
+            begin = dc.indexOf(prefix);
+            if (begin != 0) return null;
+        }
+        else
+        {
+            begin += 2;
+            var end = document.cookie.indexOf(";", begin);
+            if (end == -1) {
+            end = dc.length;
+            }
+        }
+        return unescape(dc.substring(begin + prefix.length, end));
+      }
+
       var component = this;
       component.server_root = server_root;
+      component.model_names = model_names;
 
       // Keep track of the current project, if any.
       component.project_id = ko.observable(params.project_id);
@@ -27,21 +56,7 @@ define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-chan
           description: project.description,
           creator: project.creator,
           created: project.created,
-          acl: project.acl,
-          popover: ko.pureComputed(function()
-          {
-            var members = [];
-            for(var i = 0; i != project.acl.administrators().length; ++i)
-              members.push(project.acl.administrators()[i].user());
-            for(var i = 0; i != project.acl.writers().length; ++i)
-              members.push(project.acl.writers()[i].user());
-            for(var i = 0; i != project.acl.readers().length; ++i)
-              members.push(project.acl.readers()[i].user());
-            var result = "<p>" + project.description() + "</p>";
-            result += "<p><small>Members: " + members.join(",") + "</small></p>";
-            result += "<p><small><em>Created " + project.created() + " by " + project.creator() + "</em></small></p>";
-            return result;
-          }),
+          acl: project.acl
         };
       });
 
@@ -72,13 +87,36 @@ define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-chan
         return model._id() == component.model_id();
       });
 
-      component.model_popover = ko.pureComputed(function()
-      {
-        var model = component.model();
-        if(!model.length)
-          return "";
-        model = model[0];
-        return "<p>" + model.description() + "</p><p><small><em>Created " + model.created() + " by " + model.creator() + "</em></small></p>";
+      component.navbar_popover = ko.pureComputed(function(){
+        var projectInfo = "";
+        if(component.project().length)
+        {
+          var project = component.project()[0];
+          projectInfo += "<b>Project: </b> ";
+          projectInfo += "<span>" + project.name() + "</span>";
+          var members = [];
+          for(var i = 0; i != project.acl.administrators().length; ++i)
+            members.push(project.acl.administrators()[i].user());
+          for(var i = 0; i != project.acl.writers().length; ++i)
+            members.push(project.acl.writers()[i].user());
+          for(var i = 0; i != project.acl.readers().length; ++i)
+            members.push(project.acl.readers()[i].user());
+          if(project.description())
+            projectInfo += "<div><small><b>Description:</b> " + project.description() + "</small></div>";
+          projectInfo += "<div><small><b>Members:</b> " + members.join(",") + "</small>";
+          projectInfo += "<br /><small><b>Created:</b> " + project.created() + " by " + project.creator() + "</small></div>";
+        }
+        if(component.model().length)
+        {
+          var model = component.model()[0];
+          projectInfo += "<br /><b>Model: </b> ";
+          projectInfo += "<span>" + model.name() + "<span>";
+          if(model.description())
+            projectInfo += "<div><small><b>Description:</b> " + model.description() + "</small></div>";
+          projectInfo += "<p><small><b>Created:</b> " + model.created() + " by " + model.creator() + "</small></p>";
+        }
+
+        return projectInfo;
       });
 
       component.model_alerts = ko.pureComputed(function()
@@ -232,6 +270,7 @@ define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-chan
       component.project_edit_wizards = edit_wizards.filter(project_wizard_filter);
       component.model_edit_wizards = edit_wizards.filter(model_wizard_filter);
       component.project_info_wizards = info_wizards.filter(project_wizard_filter);
+      component.model_info_wizards = info_wizards.filter(model_wizard_filter);
       component.model_bookmark_wizards = create_wizards.filter(bookmark_wizard_filter);
       component.global_delete_wizards = delete_wizards.filter(global_wizard_filter);
       component.project_delete_wizards = delete_wizards.filter(project_wizard_filter);
@@ -347,6 +386,32 @@ define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-chan
         };
       });
 
+      component.edit_saved_bookmark = function(reference)
+      {
+        var name = ko.observable(reference.name())
+        dialog.prompt(
+        {
+          title: "Edit Bookmark",
+          value: name,
+          buttons: [{className: "btn-default", label:"Cancel"}, {className: "btn-danger",label:"OK"}],
+          callback: function(button)
+          {
+            if(button.label != "OK")
+              return;
+            client.put_reference(
+            {
+              rid: reference._id(),
+              name: name(),
+              success: function()
+              {
+                component.update_references();
+              },
+              error: dialog.ajax_error("Couldn't edit bookmark."),
+            });
+          },
+        });
+      }
+
       component.delete_saved_bookmark = function(reference)
       {
         dialog.dialog(
@@ -387,6 +452,17 @@ define("slycat-navbar", ["slycat-server-root", "slycat-web-client", "slycat-chan
       }
 
       component.update_references();
+      component.sign_out = function()
+      {
+        client.sign_out({ 
+          success: function(){
+            window.location.href = "/login/slycat-login.html?from=" + window.location.href;
+          }, 
+          error: function(){
+            window.alert("Sorry, something went wrong and you are not signed out."); 
+          } 
+        })
+      }
 
     },
     template: { require: "text!" + server_root + "templates/slycat-navbar.html" }

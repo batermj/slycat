@@ -3,6 +3,8 @@ import numbers
 import numpy
 import os
 import slycat.darray
+import slycat.email
+import cherrypy
 
 class DArray(slycat.darray.Prototype):
   """Slycat darray implementation that stores data in an HDF5 file."""
@@ -159,21 +161,24 @@ class DArray(slycat.darray.Prototype):
     ----------
     attribute : integer
       The zero-based integer index of the attribute to be overwritten.
-    hyperslice : integer, :class:`slice`, :class:`Ellipsis`, or tuple containing one or more integer, :class:`slice`, and :class:`Ellipsis` instances. 
+    hyperslice : integer, :class:`slice`, :class:`Ellipsis`, or tuple containing one or more integer, :class:`slice`, and :class:`Ellipsis` instances.
       Defines the attribute region to be overwritten.
     data : numpy.ndarray
       Data to be written to the attribute.
     """
 
     if not (0 <= attribute and attribute < len(self.attributes)):
+      slycat.email.send_error("hdf5.py set_data", "Attribute index %s out-of-range." % attribute)
       raise ValueError("Attribute index %s out-of-range." % attribute)
     if isinstance(hyperslice, (numbers.Integral, slice, type(Ellipsis))):
       pass
     elif isinstance(hyperslice, tuple):
       for i in hyperslice:
         if not isinstance(i, (numbers.Integral, slice, type(Ellipsis))):
+          slycat.email.send_error("hdf5.py set_data", "Unsupported hyperslice type.")
           raise ValueError("Unsupported hyperslice type.")
     else:
+      slycat.email.send_error("hdf5.py set_data", "Unsupported hyperslice type.")
       raise ValueError("Unsupported hyperslice type.")
 
     # Store the data.
@@ -234,17 +239,23 @@ class ArraySet(object):
     -------
     array : :class:`slycat.hdf5.DArray`
     """
+    cherrypy.log.error("building start_array for put_model_array")
     stub = slycat.darray.Stub(dimensions, attributes)
     shape = [dimension["end"] - dimension["begin"] for dimension in stub.dimensions]
     stored_types = [dtype(attribute["type"]) for attribute in stub.attributes]
 
-    # Allocate space for the coming data ...
-    array_key = "array/%s" % array_index
-    if array_key in self._storage:
-      del self._storage[array_key]
-    for attribute_index, stored_type in enumerate(stored_types):
-      self._storage.create_dataset("array/%s/attribute/%s" % (array_index, attribute_index), shape, dtype=stored_type)
+    cherrypy.log.error("allocating space for start_array for put_model_array")
+    try:
+      # Allocate space for the coming data ...
+      array_key = "array/%s" % array_index
+      if array_key in self._storage:
+        del self._storage[array_key]
+      for attribute_index, stored_type in enumerate(stored_types):
+        self._storage.create_dataset("array/%s/attribute/%s" % (array_index, attribute_index), shape, dtype=stored_type)
+    except Exception as e:
+      pass
 
+    cherrypy.log.error("storing metadata for start_array for put_model_array")
     # Store array metadata ...
     array_metadata = self._storage[array_key].create_group("metadata")
     array_metadata["attribute-names"] = numpy.array([attribute["name"] for attribute in stub.attributes], dtype=h5py.special_dtype(vlen=unicode))
@@ -254,6 +265,7 @@ class ArraySet(object):
     array_metadata["dimension-begin"] = numpy.array([dimension["begin"] for dimension in stub.dimensions], dtype="int64")
     array_metadata["dimension-end"] = numpy.array([dimension["end"] for dimension in stub.dimensions], dtype="int64")
 
+    cherrypy.log.error("returning Darray for start_array for put_model_array")
     return DArray(self._storage[array_key])
 
   def store_array(self, array_index, array):
@@ -273,6 +285,7 @@ class ArraySet(object):
     array : :class:`slycat.hdf5.DArray`
     """
     if not isinstance(array, slycat.darray.Prototype):
+      slycat.email.send_error("hdf5.py store_array", "A slycat.darray is required.")
       raise ValueError("A slycat.darray is required.")
 
     index = tuple([slice(dimension["begin"], dimension["end"]) for dimension in array.dimensions])
@@ -302,16 +315,18 @@ def start_arrayset(file):
   arrayset : :class:`slycat.hdf5.ArraySet`
   """
   if not isinstance(file, h5py.File):
+    slycat.email.send_error("hdf5.py start_arrayset", "An open h5py.File is required.")
     raise ValueError("An open h5py.File is required.")
   file.create_group("array")
   return ArraySet(file)
 
-###############################################################################################################################################3
+################################################################################################################################################
 # Legacy functionality - don't use these in new code.
 
 def dtype(type):
   """Convert a string attribute type into a dtype suitable for use with h5py."""
   if type not in dtype.type_map.keys():
+    slycat.email.send_error("hdf5.py dtype", "Unsupported type: {}".format(type))
     raise Exception("Unsupported type: {}".format(type))
   return dtype.type_map[type]
 dtype.type_map = {"int8":"int8", "int16":"int16", "int32":"int32", "int64":"int64", "uint8":"uint8", "uint16":"uint16", "uint32":"uint32", "uint64":"uint64", "float32":"float32", "float64":"float64", "string":h5py.special_dtype(vlen=unicode), "float":"float32", "double":"float64"}

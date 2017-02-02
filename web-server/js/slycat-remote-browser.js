@@ -11,13 +11,19 @@ define("slycat-remote-browser", ["slycat-server-root", "slycat-web-client", "kno
     viewModel: function(params)
     {
       var component = this;
-      component.type = ko.utils.unwrapObservable(params.type);
+      component.type = ko.utils.unwrapObservable(params.type); // Specify 'remote' for file picker, 'remote-directory' for directory picker
       component.sid = params.sid;
       component.hostname = params.hostname;
       component.path = params.path;
+      component.path_input = ko.observable(component.path());
       component.selection = params.selection;
       component.open_file_callback = params.open_file_callback;
       component.raw_files = mapping.fromJS([]);
+      component.session_exists = params.session_exists;
+      component.persistence_id = params.persistence_id === undefined ? '' : params.persistence_id; // If you specify a persistence_id, it will be used as a key in localStorage so that path is restored only on remote browsers matching this id 
+      component.browse_error = ko.observable(false);
+      component.path_error = ko.observable(true);
+      component.browser_updating = ko.observable(false);
 
       component.icon_map = {
         "application/x-directory" : "<span class='fa fa-folder-o'></span>",
@@ -66,7 +72,7 @@ define("slycat-remote-browser", ["slycat-server-root", "slycat-web-client", "kno
 
       function path_dirname(path)
       {
-        var new_path = path.replace(/\/\.?(\w|\-)*\/?$/, "");
+        var new_path = path.replace(/\/\.?(\w|\-|\.)*\/?$/, "");
         if(new_path == "")
           new_path = "/";
         return new_path;
@@ -90,7 +96,8 @@ define("slycat-remote-browser", ["slycat-server-root", "slycat-web-client", "kno
       {
         var selection = [path_join(component.path(), file.name())];
         component.selection(selection);
-        if(file.type() == "f")
+        // Only allow file selection when directory selection is not specified
+        if(file.type() == "f" && component.type != 'remote-directory')
         {
           // Clear current selection
           for(var i=0; i < component.files().length; i++)
@@ -121,55 +128,98 @@ define("slycat-remote-browser", ["slycat-server-root", "slycat-web-client", "kno
         }
       }
 
+      component.up = function() {
+        component.open({name: function(){return '..';}});
+      }
+
       component.browse = function(path)
       {
         client.post_remote_browse(
         {
-          sid : component.sid(),
+          hostname : component.hostname(),
           path : path,
           success : function(results)
           {
-            localStorage.setItem("slycat-remote-browser-path-" + component.hostname(), path);
+            component.browse_error(false);
+            component.path_error(false);
+            component.browser_updating(true);
+
+            localStorage.setItem("slycat-remote-browser-path-" + component.persistence_id + component.hostname(), path);
 
             component.path(path);
+            component.path_input(path);
+
             var files = []
             if(path != "/")
               files.push({type: "", name: "..", size: "", mtime: "", mime_type:"application/x-directory"});
             for(var i = 0; i != results.names.length; ++i)
               files.push({name:results.names[i], size:results.sizes[i], type:results.types[i], mtime:results.mtimes[i], mime_type:results["mime-types"][i]});
             mapping.fromJS(files, component.raw_files);
-            $('.slycat-remote-browser-files').scrollTop(0);
+            component.browser_updating(false);
           },
           error : function(results)
           {
-            var key = "slycat-remote-browser-path-" + component.hostname();
-            var current_path = localStorage.getItem(key);
-
-            if(current_path == "/")
-              return;
-
-            current_path = current_path || "/"
-
-            localStorage.setItem(key, "/");
-            component.browse(current_path);
+            if(component.path() != component.path_input())
+            {
+              component.path_error(true);
+            }
+            component.browse_error(true);
           }
         });
       }
 
       component.browse_path = function(formElement)
       {
-        component.browse(component.path());
+        component.browse(component.path_input());
       }
 
-      component.sid.subscribe(function(new_sid)
+      component.session_exists.subscribe(function(new_session_exists)
       {
-        if(new_sid)
+        if(new_session_exists)
         {
           if(!component.path())
-            component.path(localStorage.getItem("slycat-remote-browser-path-" + component.hostname()) || "/");
+          {
+            component.path(localStorage.getItem("slycat-remote-browser-path-" + component.persistence_id + component.hostname()) || "/");
+          }
           component.browse(component.path());
         }
       });
+
+      ko.bindingHandlers.fadeError = {
+          init: function(element, valueAccessor) {
+            var value = ko.unwrap(valueAccessor()); // Get the current value of the current property we're bound to
+            $(element).toggle(value); // jQuery will hide/show the element depending on whether "value" or true or false
+          },
+          update: function(element, valueAccessor, allBindings) {
+            var value = ko.unwrap(valueAccessor());
+            if(value)
+            {
+              $(element).fadeIn(400);
+            }
+            else
+            {                
+              $(element).fadeOut(400);
+            }
+          }
+      };
+
+      ko.bindingHandlers.updateFeedback = {
+        update: function(element, valueAccessor, allBindings) {
+          var value = ko.unwrap(valueAccessor());
+          if(value)
+          {
+            $(element).fadeOut(0);
+          }
+          else
+          {                
+            $(element).scrollTop(0);
+            $(element).fadeIn(400);
+            // Some browsers don't seem to scroll to top when the element is still hidden, so calling this again after making it visible
+            $(element).scrollTop(0);
+          }
+        }
+      };
+
     },
     template: { require: "text!" + server_root + "templates/slycat-remote-browser.html" }
   });

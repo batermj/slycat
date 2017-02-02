@@ -7,8 +7,11 @@ import datetime
 import Queue
 import slycat.web.server.database.couchdb
 import slycat.web.server.hdf5
+import slycat.web.server
 import threading
 import time
+import sys
+import cPickle
 
 def _array_cleanup_worker():
   cherrypy.log.error("Started array cleanup worker.")
@@ -44,15 +47,28 @@ def _login_session_cleanup_worker():
       cherrypy.log.error("Login session cleanup worker finished.")
       time.sleep(datetime.timedelta(minutes=15).total_seconds())
     except Exception as e:
-      cherrypy.log.error("Login session cleanup worker waiting for couchdb.")
+      cherrypy.log.error("Login session cleanup worker waiting for couchdb. %s" % e.message)
       time.sleep(2)
 _login_session_cleanup_worker.thread = threading.Thread(name="session-cleanup", target=_login_session_cleanup_worker)
 _login_session_cleanup_worker.thread.daemon = True
+
+def _cache_cleanup_worker():
+      import cherrypy
+      from slycat.web.server import cache_it
+      cherrypy.log.error("Started server cache cleanup worker.")
+      while True:
+        time.sleep(datetime.timedelta(minutes=15).total_seconds())
+        cherrypy.log.error("[CACHE] running server cache-cleanup thread")
+        cache_it.clean()
+
+_cache_cleanup_worker.thread = threading.Thread(name="cache-cleanup", target=_cache_cleanup_worker)
+_cache_cleanup_worker.thread.daemon = True
 
 def start():
   """Called to start all of the cleanup worker threads."""
   _array_cleanup_worker.thread.start()
   _login_session_cleanup_worker.thread.start()
+  _cache_cleanup_worker.thread.start()
 
 def arrays():
   """Request a cleanup pass for unused arrays."""

@@ -30,6 +30,10 @@ body
   border-radius: 0;
   margin: 0;
 }
+.bootstrap-styles .navbar.model .container
+{
+  width: auto !important;
+}
 
 .bootstrap-styles .navbar-brand
 {
@@ -37,13 +41,25 @@ body
   background-size: auto 20px;
   padding-right: 0;
   text-align: right;
-  width: 155px;
+  padding-left: 110px;
+  color: #353535 !important;
 }
 
 .bootstrap-styles .navbar .breadcrumb
 {
   background-color: transparent;
   margin: 8px 0 0 0;
+  padding-left: 0;
+  padding-right: 0;
+  height: 36px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navbar .breadcrumb .project,
+.navbar .breadcrumb .model
+{
+  display: inline;
 }
 
 .bootstrap-styles .navbar .breadcrumb a
@@ -69,15 +85,19 @@ body
   font-weight: bold !important;
 }
 .nav-bookmarks .bookmark-new .fa {
-
+  margin-right: 3px;
 }
 .nav-bookmarks .bookmark-link {
   position: relative;
-  padding-right: 65px !important;
+  padding-right: 95px !important;
 }
 .nav-bookmarks .bookmark-delete {
   position: absolute;
   right: 20px;
+}
+.nav-bookmarks .bookmark-edit {
+  position: absolute;
+  right: 43px;
 }
 
 .bootstrap-styles .modal .jumbotron
@@ -85,16 +105,24 @@ body
   padding: 48px;
 }
 
-slycat-navbar .alert
+slycat-navbar nav .alert
 {
   margin: 0 !important;
 }
 
-slycat-navbar .alert pre
+slycat-navbar nav .alert pre
 {
   margin: 12px 0 0 0;
 }
-
+#slycat-wizard .slycat-remote-browser .path .alert {
+  margin-top: 10px;
+  margin-bottom: 0;
+  display: none;
+}
+#slycat-wizard .nav-pills a
+{
+  cursor: default;
+}
 #slycat-wizard .nav-tabs, #slycat-wizard .nav-pills
 {
   margin-bottom: 24px;
@@ -188,8 +216,8 @@ slycat-navbar .alert pre
 .bootstrap-styles #slycat-wizard .nav-pills > li.active > a,
 .bootstrap-styles #slycat-wizard .nav-pills > li.active > a:hover
 {
-  color: white;
-  background-color: #337AB7;
+  color: black;
+  background-color: #d7d7d7;
 }
 .bootstrap-styles #slycat-wizard .modal-footer button i
 {
@@ -210,9 +238,9 @@ slycat-navbar .alert pre
   min-height: calc(100vh - 50px);
 }
 
-#slycat-projects, #slycat-project
+#slycat-projects .container
 {
-  padding-top: 12px;
+  padding-top: 15px;
 }
 
 /* slycat-remote-browser component */
@@ -400,7 +428,7 @@ slycat-navbar .alert pre
 
 .slycat-range-slider .thumb
 {
-  background: #bbb;
+  background: #aabbff;
   border-radius: 6px;
   transition: background .25s ease-in-out;
   -moz-transition: background .25s ease-in-out;
@@ -409,7 +437,7 @@ slycat-navbar .alert pre
 
 .slycat-range-slider .thumb:hover, .slycat-range-slider.dragging .thumb, .slycat-range-slider:hover .thumb
 {
-  background: #888;
+  background: #7788ff;
 }
 
 .slycat-clickable
@@ -417,9 +445,14 @@ slycat-navbar .alert pre
   cursor: pointer;
 }
 
-.slycat-unclickable
+.slycat-unclickable,
+.slycat-unclickable a
 {
   cursor: default;
+}
+.slycat-unclickable a:hover
+{
+  text-decoration: none;
 }
 
 .zoom-sensitive
@@ -468,6 +501,10 @@ slycat-navbar .alert pre
   user-select: none;
   cursor: pointer;
 }
+.slycat-table-ingestion tbody tr.disabled th
+{
+  cursor: default;
+}
 .slycat-table-ingestion tbody tr:nth-child(odd) {
   background-color: #F2F2F2;
 }
@@ -478,6 +515,10 @@ slycat-navbar .alert pre
 .slycat-table-ingestion tbody tr.selected th
 {
   color: white;
+}
+.slycat-table-ingestion tbody tr.disabled th
+{
+  color: #cccccc;
 }
 
 /* New PIP model wizard */
@@ -503,4 +544,47 @@ slycat-navbar .alert pre
 #slycat-wizard .parameter-image-plus-model-wizard .cluster-column
 {
   margin-top: 30px;
+}
+.bootstrap-styles .navbar .dropdown-header {
+  color: #777777;
+  font-weight: normal;
+}
+.bootstrap-styles .navbar-menus {
+  margin: 14px 15px;
+}
+.navbar-personal .dropdown-toggle {
+  padding-right: 0 !important;
+}
+.bootstrap-styles .navbar-default .navbar-nav > .open > a,
+.bootstrap-styles .navbar-default .navbar-nav > .open > a:hover,
+.bootstrap-styles .navbar-default .navbar-nav > .open > a:focus
+{
+  background-color: transparent;
+}
+textarea,
+input,
+#slycat-wizard .modal-body
+{
+  resize: none;
+}
+
+/* slycat-job-checker component */
+.slycat-job-checker {
+  padding: 10px;
+}
+
+.slycat-job-checker-controls {
+  margin-bottom: 15px;
+}
+
+.slycat-job-checker-output {
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  word-wrap: break-word;
+}
+.bottom-margin,
+label.bottom-margin 
+{
+  margin-bottom: 20px;
 }

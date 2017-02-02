@@ -7,23 +7,28 @@ def register_slycat_plugin(context):
   import slycat.cca
   import slycat.web.server
   import slycat.web.server.database.couchdb
+  import slycat.email
   import threading
   import traceback
+  import time
 
   def compute(mid):
     try:
       database = slycat.web.server.database.couchdb.connect()
       model = database.get("model", mid)
-
+      start = time.time()
       # Get required inputs ...
       metadata = slycat.web.server.get_model_arrayset_metadata(database, model, "data-table")
       input_columns = slycat.web.server.get_model_parameter(database, model, "input-columns")
       output_columns = slycat.web.server.get_model_parameter(database, model, "output-columns")
       scale_inputs = slycat.web.server.get_model_parameter(database, model, "scale-inputs")
 
+      # double check the number of inputs and outputs
       if len(input_columns) < 1:
+        slycat.email.send_error("slycat-cca.py compute", "CCA model requires at least one input column.")
         raise Exception("CCA model requires at least one input column.")
       if len(output_columns) < 1:
+        slycat.email.send_error("slycat-cca.py compute", "CCA model requires at least one output column.")
         raise Exception("CCA model requires at least one output column.")
 
       # Transform the input data table to a form usable with our cca() function ...
@@ -80,7 +85,9 @@ def register_slycat_plugin(context):
       slycat.web.server.put_model_arrayset_data(database, model, "cca-statistics", "0/0/...;0/1/...", [r, wilks])
 
       slycat.web.server.update_model(database, model, state="finished", result="succeeded", finished=datetime.datetime.utcnow().isoformat(), progress=1.0, message="")
-
+      end  = time.time()
+      model["analysis_computation_time"] = (end - start)
+      database.save(model)
     except:
       cherrypy.log.error("%s" % traceback.format_exc())
 
@@ -137,6 +144,12 @@ def register_slycat_plugin(context):
     os.path.join(os.path.dirname(__file__), "js/ui.js"),
     ])
   context.register_page_resource("cca", "images", os.path.join(os.path.dirname(__file__), "images"))
+  # Register images and other resources
+  images = [
+    'ui-bg_glass_75_e6e6e6_1x400.png',
+  ]
+  for image in images:
+    context.register_page_resource("cca", image, os.path.join(os.path.dirname(__file__), "images", image))
 
   # Register custom wizards for creating CCA models.
   context.register_wizard("new-cca", "New CCA Model", require={"action":"create", "context":"project"})

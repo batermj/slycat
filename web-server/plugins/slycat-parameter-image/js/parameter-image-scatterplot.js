@@ -97,6 +97,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     self.start_drag = null;
     self.current_drag = null;
     self.end_drag = null;
+    self.login_open = false;
 
     // Setup the scatterplot ...
     self.media_layer = d3.select(self.element.get(0)).append("div").attr("class", "media-layer bootstrap-styles");
@@ -184,7 +185,12 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     {
       if(self.start_drag === null)
       {
-        self._schedule_hover_canvas(e);
+        // Only schedule a hover if user is hovering over svg, not over images, video, etc.
+        // and we have images to open
+        if(e.target.nodeName === "svg" && self.options.images.length > 0)
+        {
+          self._schedule_hover_canvas(e);
+        }
       }
       else if(self.start_drag) // Mouse is down ...
       {
@@ -571,6 +577,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       }
       self._schedule_update({update_x:true, update_y:true, update_leaders:true, render_data:true, render_selection:true, update_legend_axis:true});
       self._close_hidden_simulations();
+      self._open_shown_simulations();
     }
 
     else if(key == "auto-scale")
@@ -813,7 +820,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       // canvas.fillRect(0 + 0.5, 0 + 0.5, width, height);
       // canvas.strokeRect(0 + 0.5, 0 + 0.5, width, height);
       var end = time.now();
-      console.log("Time to render " + filtered_indices.length + " canvas points: " + (end-start) + " milliseconds.");
+      // console.log("Time to render " + filtered_indices.length + " canvas points: " + (end-start) + " milliseconds.");
     }
 
     if (self.updates.render_selection) {
@@ -873,17 +880,23 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       var images = [];
       self.options.open_images.forEach(function(image, index)
       {
-        images.push({
-          index : image.index,
-          uri : image.uri.trim(),
-          image_class : "open-image",
-          x : width * image.relx,
-          y : height * image.rely,
-          width : image.width,
-          height : image.height,
-          target_x : self.x_scale(self.options.x[image.index]),
-          target_y : self.y_scale(self.options.y[image.index]),
-          });
+        // Making sure we have an index and uri before attempting to open an image
+        if(image.index != null && image.uri != undefined)
+        {
+          images.push({
+            index : image.index,
+            uri : image.uri.trim(),
+            image_class : "open-image",
+            x : width * image.relx,
+            y : height * image.rely,
+            width : image.width,
+            height : image.height,
+            target_x : self.x_scale(self.options.x[image.index]),
+            target_y : self.y_scale(self.options.y[image.index]),
+            video : image.video,
+            currentTime : image.currentTime
+            });
+        }
       });
       self._open_images(images);
     }
@@ -1005,21 +1018,30 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     // Get the scatterplot width so we can convert absolute to relative coordinates.
     var width = Number(self.svg.attr("width"));
     var height = Number(self.svg.attr("height"));
-    var open_images = [];
+
+    self.options.open_images = [];
     $(".open-image").each(function(index, frame)
     {
       var frame = $(frame);
-      open_images.push({
+      var open_element = {
         index : Number(frame.attr("data-index")),
         uri : frame.attr("data-uri"),
         relx : Number(frame.attr("data-transx")) / width,
         rely : Number(frame.attr("data-transy")) / height,
         width : frame.outerWidth(),
         height : frame.outerHeight(),
-        });
+      };
+      var video = frame.find('video')[0];
+      if(video != undefined)
+      {
+        var currentTime = video.currentTime;
+        open_element["currentTime"] = currentTime;
+        open_element["video"] = true;
+      }
+      self.options.open_images.push(open_element);
     });
 
-    self.element.trigger("open-images-changed", [open_images]);
+    self.element.trigger("open-images-changed", [self.options.open_images]);
   },
 
   _open_images: function(images, is_stl_return)
@@ -1061,9 +1083,21 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     var add_pin_button = function(fh) {
       fh.append("span")
         .attr('class', 'pin-button frame-icon')
+        .attr('title', 'Pin')
         .on("mousedown", handlers["stop_event"])
         .on("mouseup", handlers["stop_event"])
         .on("click", handlers["pin"]);
+    };
+
+    var add_download_button = function(fh, uri, filename) {
+      fh.append("a")
+        .attr('href', uri)
+        .attr('class', 'fa fa-download download-button')
+        .attr('title', 'Download media file')
+        .attr('download', filename)
+        .on("mousedown", handlers["stop_event"])
+        .on("mouseup", handlers["stop_event"])
+        ;
     };
 
     var build_frame_html = function(img) {
@@ -1161,7 +1195,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
         self.state = "moving";
         sourceEventTarget = d3.select(d3.event.sourceEvent.target);
 
-        if (sourceEventTarget.classed("image-frame") || sourceEventTarget.classed("image") || sourceEventTarget.classed("bootstrap-styles")) {
+        if ( sourceEventTarget.classed("image-frame") || sourceEventTarget.classed("image") || sourceEventTarget.classed("bootstrap-styles") || d3.event.sourceEvent.target.nodeName == "VIDEO") {
           frame = d3.select(this);
 
           if (frame.classed("hover-image")) {
@@ -1192,7 +1226,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           $(d3.event.target.parentNode).detach().appendTo(self.media_layer.node());
         } else if (target.classed("image-frame")) {
           // Move this image to the top of the Z order ...
-          target.detach().appendTo(self.media_layer.node());
+          $(d3.event.target).detach().appendTo(self.media_layer.node());
         } else if (target.classed('slycat-3d-btn-settings')) {
           d3.select('#slycat-3d-modal')
             .on('.drag', null)
@@ -1207,16 +1241,22 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       }),
       resize: (function() {
         var frame, min, target_width, x, y;
+        min = 50;
         x = d3.event.x;
         y = d3.event.y;
-        min = 50;
         if (0 <= y && y <= self.options.height && 0 <= x && x <= self.options.width && x > min && y > min) {
           frame = d3.select(this.parentNode);
           var ratio = frame.attr("data-ratio") ? frame.attr("data-ratio") : 1;
+          var video = frame.attr("data-type") == "video";
           target_width = self._scale_width(ratio, x, y);
+          target_height = self._scale_height(ratio, x, y);
+          if(video)
+          {
+            target_height += 40;
+          }
           frame.style({
             width: target_width + "px",
-            height: y + "px"
+            height: target_height + "px"
           });
           self._adjust_leader_line(frame);
         }
@@ -1245,15 +1285,18 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
         d3.event.sourceEvent.stopPropagation();
       }),
       pin: (function() {
-        var frame, imageHeight, imageWidth, target_width, theImage, x, y;
+        var frame, imageHeight, imageWidth, target_width, target_height, theImage, x, y;
         self.opening_image = null;
         clear_hover_timer(self);
         frame = d3.select(d3.event.target.parentNode);
 
-        if (frame.select('.resize').size())
-          theImage = frame.select(".resize").classed("hover-image", false).classed("open-image", true);
-        else
-          theImage = frame.classed("hover-image", false).classed("open-image", true);
+        // This was causing Issue #565 because it was assigning the open-image class to the image instead of its frame.
+        // Alex is commenting it out and always assigning the open-image class to the frame instead.
+        // if (frame.select('.resize').size())
+        //   theImage = frame.select(".resize").classed("hover-image", false).classed("open-image", true);
+        // else
+        //   theImage = frame.classed("hover-image", false).classed("open-image", true);
+        theImage = frame.classed("hover-image", false).classed("open-image", true);
 
         imageWidth = isStl ? self.options.pinned_stl_width : self.options.pinned_width;
         imageHeight = isStl ? self.options.pinned_stl_height : self.options.pinned_height;
@@ -1269,6 +1312,11 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
         var ratio = frame.attr("data-ratio") ? frame.attr("data-ratio") : 1;
         target_width = self._scale_width(ratio, imageWidth, imageHeight);
+        target_height = self._scale_height(ratio, imageWidth, imageHeight);
+        if(frame.attr("data-type") == "video")
+        {
+          target_height += 40;
+        }
         x = self._getDefaultXPosition(image.index, imageWidth);
         y = self._getDefaultYPosition(image.index, imageHeight);
 
@@ -1276,6 +1324,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           left: x + "px",
           top: y + "px",
           width: target_width + "px",
+          height: target_height + "px",
         });
 
         if (isStl)
@@ -1286,6 +1335,12 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
         $(window).trigger('resize');
         return false;
+      }),
+      pause_video: (function(){
+        self._sync_open_images();
+      }),
+      seeked_video: (function(){
+        self._sync_open_images();
       })
     }
 
@@ -1342,7 +1397,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
       if(blob.type.indexOf('image/') == 0) {
         // Create the html image ...
-        var htmlImage = frame_html.append("img")
+        var htmlImage = frame_html
+          .append("img")
           .attr("class", "image resize")
           .attr("src", image_url)
           .attr("data-ratio", image.width / image.height)
@@ -1379,6 +1435,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           .attr("data-uri", image.uri)
           .attr("src", image_url)
           .attr("controls", true)
+          .attr("loop", true)
           .style({
             "display": "none",
           })
@@ -1396,6 +1453,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
               .attr("data-width", width)
               .attr("data-height", height)
               .attr("data-ratio", ratio)
+              .attr("data-type", "video")
               .style({
                 "width": target_width + "px",
                 "height": "auto",
@@ -1405,7 +1463,32 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
                 "display": "block",
               });
             self._adjust_leader_line(frame_html);
+          })
+          .on("pause", handlers["pause_video"])
+          .on("seeked", handlers["seeked_video"])
+          ;
+        if(image.currentTime != undefined && image.currentTime > 0)
+        {
+          video.property("currentTime", image.currentTime);
+        }
+
+      }
+      else {
+        // We don't support this file type, so just create a download link
+        console.log("creating download link");
+        frame_html
+          .style({
+            "width": "200px",
+            "height": "200px",
           });
+        self._adjust_leader_line(frame_html);
+        var download = frame_html
+          .append("a")
+          .attr("href", image_url)
+          .attr("class", "download-link")
+          .attr("download", "download")
+          .text("Download " + image.uri)
+          ;
       }
 
       // Remove loading indicator image
@@ -1419,6 +1502,9 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
       // Create a pin button ...
       add_pin_button(frame_html);
+
+      // Create a download button ...
+      add_download_button(frame_html, image_url, image.uri.split('/').pop());
 
       if(!image.no_sync)
         self._sync_open_images();
@@ -1442,7 +1528,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       var viewer = document.createElement('slycat-3d-viewer');
 
       var ps = document.createAttribute('params')
-      ps.value = "backgroundColor: '#FFFFFF', uri: '" + server_root + "projects/" + model.project + "/cache/" + URI.encode(uri.host() + uri.path()) + "', container: $element";
+      var stl_uri = server_root + "projects/" + model.project + "/cache/" + URI.encode(uri.host() + uri.path());
+      ps.value = "backgroundColor: '#FFFFFF', uri: '" + stl_uri + "', container: $element";
       var s = document.createAttribute('style');
       s.value = 'width: 100%; height: 100%;';
       viewer.setAttributeNode(ps);
@@ -1453,7 +1540,11 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
       add_resize_handle(frame_html);
       add_pin_button(frame_html);
+      add_download_button(frame_html, stl_uri, image.uri.split('/').pop());
 
+      self._open_images(images.slice(1), true);
+
+      // Do not comment out this return because it will cause an infinite loop and Firefox will blacklist WebGL.
       return;
     }
 
@@ -1473,82 +1564,88 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     xhr.onload = function(e){
       //If the image isn't in cache, open an agent session:
       if (this.status == 404) {
-        self.remotes.get_remote({
-          hostname: uri.hostname(),
-          title: "Login to " + uri.hostname(),
-          message: "Loading " + uri.pathname(),
-          cancel: function() {
-            var jFrame = $(".scaffolding." + image.image_class + "[data-uri=\"" + image.uri + "\"]");
-            var frame = d3.select(jFrame[0]);
-            var related_frames = jFrame.closest('.media-layer').children('.scaffolding').filter(function(_,x){ return URI($(x).attr("data-uri")).hostname() == uri.hostname(); });
-            related_frames.find(".loading-image").remove();
+        if(!self.login_open)
+        {
+          self.login_open = true;
+          self.remotes.get_remote({
+            hostname: uri.hostname(),
+            title: "Login to " + uri.hostname(),
+            message: "Loading " + uri.pathname(),
+            cancel: function() {
+              var jFrame = $(".scaffolding." + image.image_class + "[data-uri=\"" + image.uri + "\"]");
+              var frame = d3.select(jFrame[0]);
+              var related_frames = jFrame.closest('.media-layer').children('.scaffolding').filter(function(_,x){ return URI($(x).attr("data-uri")).hostname() == uri.hostname(); });
+              related_frames.find(".loading-image").remove();
 
-            var reload_button = d3.selectAll(related_frames.filter(":not(:has(>.reload-button))")).append("span")
-              .attr("class", "fa fa-refresh reload-button")
-              .attr("title", "Could not load image. Click to reconnect.")
-              .each(function(){
-                var parent = d3.select(this.parentNode);
-                d3.select(this).style({
-                  top: (parseInt(parent.style("height"))/2 - 16) + "px",
-                  left: (parseInt(parent.style("width"))/2 - 16) + "px",
-                  cursor: "pointer"})})
-              .on("click", (function(img, frame){
-                return function(){
-                  var hostname = URI(img.uri).hostname();
-                  var images = $(this).closest(".media-layer").children(".scaffolding").filter(function(_,x){ return URI($(x).attr("data-uri")).hostname() == hostname; })
-                  var loading_image = d3.selectAll(images).append("div").attr("class", "loading-image");
-                  images.find(".reload-button").remove();
-                  self._open_images(images.map(function(_,x){ return {uri: $(x).attr("data-uri"), image_class: image.image_class}; }));
-                }})(image, frame));
-          },
-          success: function(sid) {
-            var xhr = new XMLHttpRequest();
-            var api = "/file";
-            if(self.options.video_file_extensions.indexOf(uri.suffix()) > -1) {
-              api = "/file";
-            }
-
-            xhr.image = image;
-            //Double encode to avoid cherrypy's auto unencode in the controller
-            xhr.open("GET", server_root + "remotes/" + sid + api + uri.pathname() + "?cache=project&project=" + model.project + "&key=" + URI.encode(URI.encode(uri.host() + uri.path())), true);
-            xhr.responseType = "arraybuffer";
-            xhr.onload = function(e) {
-              // If we get 404, the remote session no longer exists because it timed-out.
-              // If we get 500, there was an internal error communicating to the remote host.
-              // Either way, delete the cached session and create a new one.
-              if(this.status == 404 || this.status == 500) {
-                self.remotes.delete_remote(uri.hostname());
-                self._open_images(images);
-                return;
+              var reload_button = d3.selectAll(related_frames.filter(":not(:has(>.reload-button))")).append("span")
+                .attr("class", "fa fa-refresh reload-button")
+                .attr("title", "Could not load image. Click to reconnect.")
+                .each(function(){
+                  var parent = d3.select(this.parentNode);
+                  d3.select(this).style({
+                    top: (parseInt(parent.style("height"))/2 - 16) + "px",
+                    left: (parseInt(parent.style("width"))/2 - 16) + "px",
+                    cursor: "pointer"})})
+                .on("click", (function(img, frame){
+                  return function(){
+                    var hostname = URI(img.uri).hostname();
+                    var images = $(this).closest(".media-layer").children(".scaffolding").filter(function(_,x){ return URI($(x).attr("data-uri")).hostname() == hostname; })
+                    var loading_image = d3.selectAll(images).append("div").attr("class", "loading-image");
+                    images.find(".reload-button").remove();
+                    self._open_images(images.map(function(_,x){ return {uri: $(x).attr("data-uri"), image_class: image.image_class}; }));
+                  }})(image, frame));
+              self.login_open = false;
+            },
+            success: function(hostname) {
+              var xhr = new XMLHttpRequest();
+              var api = "/file";
+              if(self.options.video_file_extensions.indexOf(uri.suffix()) > -1) {
+                api = "/file";
               }
-              // If we get 400, it means that the session is good and we're
-              // communicating with the remote host, but something else went wrong
-              // (probably file permissions issues).
-              if(this.status == 400) {
-                var message = this.getResponseHeader("slycat-message");
-                var hint = this.getResponseHeader("slycat-hint");
 
-                if(message && hint) {
-                  window.alert(message + "\n\n" + hint);
-                } else if(message) {
-                  window.alert(message);
-                } else {
-                  window.alert("Error loading image " + this.image.uri + ": " + this.statusText);
+              xhr.image = image;
+              //Double encode to avoid cherrypy's auto unencode in the controller
+              xhr.open("GET", server_root + "remotes/" + hostname + api + uri.pathname() + "?cache=project&project=" + model.project + "&key=" + URI.encode(URI.encode(uri.host() + uri.path())), true);
+              xhr.responseType = "arraybuffer";
+              xhr.onload = function(e) {
+                // If we get 404, the remote session no longer exists because it timed-out.
+                // If we get 500, there was an internal error communicating to the remote host.
+                // Either way, delete the cached session and create a new one.
+                if(this.status == 404 || this.status == 500) {
+                  self.remotes.delete_remote(uri.hostname());
+                  self._open_images(images);
+                  return;
                 }
+                // If we get 400, it means that the session is good and we're
+                // communicating with the remote host, but something else went wrong
+                // (probably file permissions issues).
+                if(this.status == 400) {
+                  var message = this.getResponseHeader("slycat-message");
+                  var hint = this.getResponseHeader("slycat-hint");
 
-                return;
-              } else {
-                // We received the image, so put it in the cache and start-over.
-                var array_buffer_view = new Uint8Array(this.response);
-                var blob = new Blob([array_buffer_view], {type:this.getResponseHeader('content-type')});
-                self.options.image_cache[image.uri] = blob;
-                self._open_images(images, true);
+                  if(message && hint) {
+                    window.alert(message + "\n\n" + hint);
+                  } else if(message) {
+                    window.alert(message);
+                  } else {
+                    window.alert("Error loading image " + this.image.uri + ": " + this.statusText);
+                  }
+
+                  return;
+                } else {
+                  // We received the image, so put it in the cache and start-over.
+                  var array_buffer_view = new Uint8Array(this.response);
+                  var blob = new Blob([array_buffer_view], {type:this.getResponseHeader('content-type')});
+                  self.options.image_cache[image.uri] = blob;
+                  self._open_images(images, true);
+                }
               }
-            }
 
-            xhr.send();
-          },
-        })
+              xhr.send();
+              self.login_open = false;
+            },
+          })
+        }
       } else {
         // We received the image, so put it in the cache and start-over.
         var array_buffer_view = new Uint8Array(this.response);
@@ -1569,6 +1666,39 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       .each(function(){
         self._remove_image_and_leader_line(d3.select(this));
       });
+  },
+
+  _open_shown_simulations: function() {
+    var self = this;
+    var areOpen = [];
+
+    $(".media-layer div.image-frame")
+      .each(function(){
+        areOpen.push($(this).data("index"));
+      });
+
+    var width = Number(self.svg.attr("width"));
+    var height = Number(self.svg.attr("height"));
+    var images = [];
+    self.options.open_images.forEach(function(image, index)
+    {
+      // Making sure we have an index and uri before attempting to open an image
+      if( image.index != null && image.uri != undefined && self.options.filtered_indices.indexOf(image.index) != -1 && areOpen.indexOf(image.index) == -1 )
+      {
+        images.push({
+          index : image.index,
+          uri : image.uri.trim(),
+          image_class : "open-image",
+          x : width * image.relx,
+          y : height * image.rely,
+          width : image.width,
+          height : image.height,
+          target_x : self.x_scale(self.options.x[image.index]),
+          target_y : self.y_scale(self.options.y[image.index]),
+          });
+      }
+    });
+    self._open_images(images);
   },
 
   close_all_simulations: function() {
@@ -1775,6 +1905,19 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     else
     {
       return ratio * target_height;
+    }
+  },
+
+  _scale_height: function(ratio, target_width, target_height)
+  {
+    var target_ratio = target_width / target_height;
+    if(ratio > target_ratio)
+    {
+      return target_width / ratio;
+    }
+    else
+    {
+      return target_height;
     }
   },
 

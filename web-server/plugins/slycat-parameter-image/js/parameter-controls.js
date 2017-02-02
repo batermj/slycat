@@ -86,8 +86,8 @@ $.widget("parameter_image.controls",
         .appendTo(scatterplot_controls)
         ;
       this.image_button = $('\
-        <button class="btn btn-default dropdown-toggle" type="button" id="image-dropdown" data-toggle="dropdown" aria-expanded="true" title="Change Image Set Variable"> \
-          Image Set \
+        <button class="btn btn-default dropdown-toggle" type="button" id="image-dropdown" data-toggle="dropdown" aria-expanded="true" title="Change Media Set Variable"> \
+          Media Set \
           <span class="caret"></span> \
         </button> \
         ')
@@ -210,29 +210,18 @@ $.widget("parameter_image.controls",
   },
 
 
-  _write_data_table: function(sl)
+  _write_data_table: function(selectionList)
   {
-    var selectionList = sl || [];
     var self = this;
-    var numRows = self.options.metadata['row-count'];
-    var numCols = self.options.metadata['column-count'];
-    var rowRequest = "";
-
-    if (selectionList.length > 0) {
-      selectionList.sort(function(x,y) {return x-y});
-      rowRequest = "rows=" + selectionList.toString();
-    } else {
-      rowRequest = "rows=0-" + numRows;
-    }
-
     $.ajax(
     {
-      type : "GET",
-      url : server_root + "models/" + self.options.mid + "/tables/" + self.options.aid + "/arrays/0/chunk?" + rowRequest + "&columns=0-" + numCols + "&index=Index",
-      //url : self.options['server-root'] + "models/" + self.options.mid + "/tables/" + self.options.aid + "/arrays/0/chunk?rows=0-" + numRows + "&columns=0-" + numCols + "&index=Index",
+      type : "POST",
+      url : server_root + "models/" + self.options.mid + "/arraysets/" + self.options.aid + "/data",
+      data: JSON.stringify({"hyperchunks": "0/.../..."}),
+      contentType: "application/json",
       success : function(result)
       {
-        self._write_csv( self._convert_to_csv(result), self.options.model_name + "_data_table.csv" );
+        self._write_csv( self._convert_to_csv(result, selectionList), self.options.model_name + "_data_table.csv" );
       },
       error: function(request, status, reason_phrase)
       {
@@ -243,70 +232,44 @@ $.widget("parameter_image.controls",
 
   _write_csv: function(csvData, defaultFilename)
   {
-    var self = this;
-    var D = document;
-    var a = D.createElement("a");
-    var strMimeType = "text/plain";
-    var defaultFilename = defaultFilename || "slycatDataTable.csv";
-
-    //build download link:
-    a.href = "data:" + strMimeType + ";charset=utf-8," + encodeURIComponent(csvData);  //encodeURIComponent() handles all special chars
-
-    if ('download' in a) { //FF20, CH19
-      a.setAttribute("download", defaultFilename);
-      a.innerHTML = "downloading...";
-      D.body.appendChild(a);
-      setTimeout(function() {
-        var e = D.createEvent("MouseEvent");
-	e.initMouseEvent("click", true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-	a.dispatchEvent(e);
-	D.body.removeChild(a);
-      }, 66);
-      return true;
-    } else {   // end if('download' in a)
-      console.log("++ firefox/chrome detect failed");
-    }
-/*
-    if (window.MSBlobBuilder) { // IE10
-      console.log( "doing the IE10 stuff" );
-      var bb = new MSBlobBuilder();
-      bb.append(strData);
-      return navigator.msSaveBlob(bb, strFileName);
-    }
-
-    //do iframe dataURL download: (older W3)
-    console.log( "doing the older W3 stuff" );
-    var f = D.createElement("iframe");
-    D.body.appendChild(f);
-    f.src = "data:" + (A[2] ? A[2] : "application/octet-stream") + (window.btoa ? ";base64" : "") + "," + (window.btoa ? window.btoa : escape)(strData);
-    setTimeout(function() {
-      D.body.removeChild(f);
-    }, 333);
-    return true;
-*/
+    var blob = new Blob([ csvData ], {
+      type : "application/csv;charset=utf-8;"
+    });
+    var csvUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = csvUrl;
+    link.style = "visibility:hidden";
+    link.download = defaultFilename || "slycatDataTable.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 
-  _convert_to_csv: function(array)
+  _convert_to_csv: function(array, sl)
   {
     // Note that array.data is column-major:  array.data[0][*] is the first column
-    var numRows = array.rows.length;
-    var numCols = array.columns.length;
+    var self = this;
+    var selectionList = sl || [];
+    var numRows = array[0].length;
+    var numCols = array.length;
     var rowMajorOutput = "";
-    numCols = numCols - 1;  // skip last column which is slycat index
     var r, c;
     // add the headers
     for(c=0; c<numCols; c++) {
-      rowMajorOutput += array["column-names"][c] + ",";
+      rowMajorOutput += self.options.metadata["column-names"][c] + ",";
     }
     rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
     rowMajorOutput += "\n";
     // add the data
     for(r=0; r<numRows; r++) {
-      for(c=0; c<numCols; c++) {
-        rowMajorOutput += array.data[c][r] + ",";
+      if(selectionList.length == 0 || selectionList.indexOf(r) > -1)
+      {
+        for(c=0; c<numCols; c++) {
+          rowMajorOutput += array[c][r] + ",";
+        }
+        rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
+        rowMajorOutput += "\n";
       }
-      rowMajorOutput = rowMajorOutput.slice(0, -1); //rmv last comma
-      rowMajorOutput += "\n";
     }
     return rowMajorOutput;
   },
@@ -375,28 +338,37 @@ $.widget("parameter_image.controls",
     if(this.options.image_variables != null && this.options.image_variables.length > 0)
     {
       this.image_items.empty();
+      appendImageVariable(-1, 'None');
       for(var i = 0; i < this.options.image_variables.length; i++) {
-        $("<li role='presentation'>")
-          .toggleClass("active", self.options["image-variable"] == self.options.image_variables[i])
-          .attr("data-imagevariable", this.options.image_variables[i])
-          .appendTo(self.image_items)
-          .append(
-            $('<a role="menuitem" tabindex="-1">')
-              .html(this.options.metadata['column-names'][this.options.image_variables[i]])
-              .click(function()
-              {
-                var menu_item = $(this).parent();
-                if(menu_item.hasClass("active"))
-                  return false;
-
-                self.image_items.find("li").removeClass("active");
-                menu_item.addClass("active");
-
-                self.element.trigger("images-selection-changed", menu_item.attr("data-imagevariable"));
-              })
-          )
-          ;
+        appendImageVariable(self.options.image_variables[i], self.options.metadata['column-names'][self.options.image_variables[i]]);
       }
+    }
+
+    function appendImageVariable(index, label){
+      $("<li role='presentation'>")
+        .toggleClass("active", self.options["image-variable"] == index)
+        .attr("data-imagevariable", index)
+        .appendTo(self.image_items)
+        .append(
+          $('<a role="menuitem" tabindex="-1">')
+            .html(label)
+            .click(function()
+            {
+              var menu_item = $(this).parent();
+              if(menu_item.hasClass("active"))
+                return false;
+
+              self.options["image-variable"] = menu_item.attr("data-imagevariable")
+
+              self.image_items.find("li").removeClass("active");
+              menu_item.addClass("active");
+
+              self.pin_item.toggleClass("disabled", self.options["image-variable"] == -1 || self.options["image-variable"] == null);
+
+              self.element.trigger("images-selection-changed", menu_item.attr("data-imagevariable"));
+            })
+        )
+        ;
     }
 
   },
@@ -540,6 +512,7 @@ $.widget("parameter_image.controls",
       ;
     self.pin_item = $("<li role='presentation'>")
       .appendTo(self.selection_items)
+      .toggleClass("disabled", self.options["image-variable"] == -1 || self.options["image-variable"] == null)
       .append(
         $('<a role="menuitem" tabindex="-1">')
           .html("Pin")
@@ -625,6 +598,7 @@ $.widget("parameter_image.controls",
       self.image_items.find("li").removeClass("active");
       self.image_items.find('li[data-imagevariable="' + self.options["image-variable"] + '"]').addClass("active");
     }
+    self.pin_item.toggleClass("disabled", this.options["image-variable"] == -1 || this.options["image-variable"] == null);
   },
 
   _set_selected_color: function()

@@ -7,6 +7,8 @@ services:
   - couchdb
 
 before_install:
+  - sudo mkdir -p /var/lib/slycat/upload-store
+  - sudo chmod a+rw /var/lib/slycat/upload-store
   - env | sort
   - sudo apt-get update -qq
   - sudo apt-get install -y python-software-properties ssh
@@ -19,6 +21,11 @@ before_install:
   - wget http://johnvansickle.com/ffmpeg/releases/ffmpeg-release-64bit-static.tar.xz
   - mkdir ffmpeg
   - tar xf ffmpeg-release-64bit-static.tar.xz --strip-components 1 -C ffmpeg
+  - wget https://github.com/mozilla/geckodriver/releases/download/v0.11.1/geckodriver-v0.11.1-linux64.tar.gz
+  - tar xf geckodriver-v0.11.1-linux64.tar.gz
+  - sudo cp $TRAVIS_BUILD_DIR/geckodriver /usr/bin/geckodriver
+  - sudo mv $TRAVIS_BUILD_DIR/geckodriver /usr/bin/wires
+  - export PATH=/usr/bin:$PATH
   - export PATH=$TRAVIS_BUILD_DIR/ffmpeg:$PATH
   # Point Python to the Slycat packages.
   - export PYTHONPATH=$TRAVIS_BUILD_DIR/packages:$PYTHONPATH
@@ -37,13 +44,13 @@ before_install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
-  - export PATH=$HOME/miniconda/bin:$PATH
+  - export PATH=$HOME/miniconda2/bin:$PATH
   - conda update --yes conda
 
 install:
   - conda create --yes -n slycat coverage h5py mock nose paramiko Pillow pip pyparsing requests scipy
   - source activate slycat
-  - pip install --no-use-wheel behave "cherrypy==3.2.6" couchdb coveralls python-ldap pystache routes tornado-couchdb selenium pyvirtualdisplay
+  - pip install --no-use-wheel behave cherrypy couchdb coveralls python-ldap pystache routes tornado-couchdb selenium pyvirtualdisplay
   - python $TRAVIS_BUILD_DIR/web-server/slycat-couchdb-setup.py
   - sudo haproxy -f $TRAVIS_BUILD_DIR/travis-ci/proxy-server-config.conf -db &
   - python $TRAVIS_BUILD_DIR/feed-server/slycat-feed-server.py --config $TRAVIS_BUILD_DIR/travis-ci/config.ini &
@@ -51,7 +58,7 @@ install:
   - env | sort
 
 script:
-  - REQUESTS_CA_BUNDLE=$TRAVIS_BUILD_DIR/root-ca.cert coverage run --source agent,packages/slycat --omit="packages/slycat/web/server/*" -m behave -i "(agent|hyperchunks|rest-api|slycat-web-server|slycat-project)"
+  - REQUESTS_CA_BUNDLE=$TRAVIS_BUILD_DIR/root-ca.cert coverage run --source agent,packages/slycat --omit="packages/slycat/web/server/*" -m behave -i "(agent|hyperchunks|rest-api)"
   - coverage report
 
 after_script:

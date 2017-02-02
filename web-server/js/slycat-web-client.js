@@ -8,6 +8,14 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
 {
   var module = {};
 
+  /**
+   * delete a model for a Slycat project
+   * @param params: object{
+   * mid: model id that is to be deleted from the Slycat project
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.delete_model = function(params)
   {
     $.ajax(
@@ -23,10 +31,18 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
+  /**
+   * delete a project in Slycat
+   * @param params: object{
+   * pid: project id of project that is to be deleted from the Slycat
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.delete_project = function(params)
   {
     $.ajax(
@@ -42,10 +58,18 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
+  /**
+   * delete a reference in Slycat
+   * @param params: object{
+   * rid: reference id of reference that is to be deleted from Slycat
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.delete_reference = function(params)
   {
     $.ajax(
@@ -61,10 +85,18 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
+  /**
+   * delete a remote ssh session from the Slycat server
+   * @param params: object{
+   * sid: session id of open session that is to be deleted from Slycat
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.delete_remote = function(params)
   {
     $.ajax(
@@ -80,10 +112,22 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
+  /**
+   * delete a temp upload file from the slycat server
+   * generally you would call this if there was an error in the upload or
+   * if the file was successfully uploaded for cleanup purposes. note that
+   * Uploads are considered temporary and only should be used as a mean to
+   * transport files to the server
+   * @param params: object{
+   * uid: upload id of the partial or fully uploaded file to be deleted from Slycat
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.delete_upload = function(params)
   {
     $.ajax(
@@ -99,10 +143,17 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
+  /**
+   *
+   * @param params: object{
+   * success(result): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
   module.get_configuration_markings = function(params)
   {
     $.ajax(
@@ -119,9 +170,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.get_configuration_parsers = function(params)
   {
@@ -300,7 +351,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
           params.error(request, status, reason_phrase);
       },
     });
-  }
+  };
 
   module.get_model_arrayset_data = function(params)
   {
@@ -320,7 +371,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
           params.error(request, status, reason_phrase);
       },
     });
-  }
+  };
 
   module.get_model_command = function(params)
   {
@@ -340,7 +391,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
           params.error(request, status, reason_phrase);
       },
     });
-  }
+  };
 
   module.post_model_command = function(params)
   {
@@ -360,7 +411,24 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
           params.error(request, status, reason_phrase);
       },
     });
-  }
+  };
+
+  module.post_sensitive_model_command = function(params) {
+    $.ajax({
+      contentType: "application/json",
+      type: "POST",
+      url: server_root + "models/" + params.mid + "/sensitive/" + params.type + "/" + params.command,
+      data: JSON.stringify(params.parameters || {}),
+      success: function(result) {
+        if(params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase) {
+        if(params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
 
   module.put_model_command = function(params)
   {
@@ -380,7 +448,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
           params.error(request, status, reason_phrase);
       },
     });
-  }
+  };
 
   module.get_model_parameter = function(params)
   {
@@ -474,6 +542,26 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       }
     });
   }
+
+  module.get_remotes = function(params)
+  {
+    $.ajax(
+    {
+      dataType: "json",
+      type: "GET",
+      url: server_root + "remotes/" + params.hostname,
+      success: function(result)
+      {
+        if(params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase)
+      {
+        if(params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
 
   module.get_remote_video_status = function(params)
   {
@@ -585,9 +673,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.post_projects = function(params)
   {
@@ -610,9 +698,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.post_project_models = function(params)
   {
@@ -637,9 +725,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.post_project_references = function(params)
   {
@@ -667,9 +755,44 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
+
+  /**
+   * put a reference in Slycat
+   * @param params: object{
+   * rid: reference id of reference that is to be updated
+   * success(): function called upon success
+   * error(request, status, reason_phrase): function called upon error
+   * }
+   */
+  module.put_reference = function(params)
+  {
+    var data = {};
+    if("name" in params)
+      data["name"] = params["name"];
+    if("bid" in params)
+      data["bid"] = params["bid"];
+
+    $.ajax(
+    {
+      contentType: "application/json",
+      data: JSON.stringify(data),
+      type: "PUT",
+      url: server_root + "references/" + params.rid,
+      success: function()
+      {
+        if(params.success)
+          params.success();
+      },
+      error: function(request, status, reason_phrase)
+      {
+        if(params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
 
   module.post_remotes = function(params)
   {
@@ -681,7 +804,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         hostname: params.hostname,
         username: params.username,
         password: params.password,
-        agent: params.agent !== undefined ? params.agent : null,
+        agent: params.agent !== undefined ? params.agent : null
       }),
       type: "POST",
       url: server_root + "remotes",
@@ -694,19 +817,34 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
+
+  module.get_session_status = function(params) {
+    $.ajax({
+      contentType: 'application/json',
+      type: 'GET',
+      url: server_root + 'remotes/'+params.hostname+'/session-status',
+      success: function(result) {
+        if (params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase) {
+        if (params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
 
   module.post_remote_launch = function(params) {
     $.ajax({
       contentType: 'application/json',
       data: JSON.stringify({
-        sid: params.sid,
         command: params.command
       }),
       type: 'POST',
-      url: server_root + 'remotes/launch',
+      url: server_root + 'remotes/'+params.hostname+'/launch',
       success: function(result) {
         if (params.success)
           params.success(result);
@@ -722,11 +860,10 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     $.ajax({
       contentType: 'application/json',
       data: JSON.stringify({
-        sid: params.sid,
         filename: params.filename
       }),
       type: 'POST',
-      url: server_root + 'remotes/submit-batch',
+      url: server_root + 'remotes/'+params.hostname+'submit-batch',
       success: function(result) {
         if (params.success)
           params.success(result);
@@ -738,15 +875,11 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     });
   };
 
-  module.post_checkjob = function(params) {
+  module.get_checkjob = function(params) {
     $.ajax({
       contentType: 'application/json',
-      data: JSON.stringify({
-        sid: params.sid,
-        jid: params.jid
-      }),
-      type: 'POST',
-      url: server_root + 'remotes/checkjob',
+      type: 'GET',
+      url: server_root + 'remotes/checkjob/'+params.hostname+"/"+params.jid,
       success: function(result) {
         if (params.success)
           params.success(result);
@@ -758,15 +891,11 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     });
   };
 
-  module.post_cancel_job = function(params) {
+  module.delete_job = function(params) {
     $.ajax({
       contentType: 'application/json',
-      data: JSON.stringify({
-        sid: params.sid,
-        jid: params.jid
-      }),
-      type: 'POST',
-      url: server_root + 'remotes/cancel-job',
+      type: 'DELETE',
+      url: server_root + 'remotes/delete-job/'+params.hostname+'/'+params.jid,
       success: function(result) {
         if (params.success)
           params.success(result);
@@ -781,13 +910,43 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
   module.get_job_output = function(params) {
     $.ajax({
       contentType: 'application/json',
+      type: 'GET',
+      url: server_root + 'remotes/get-job-output/'+params.hostname+"/"+params.jid+"/path"+params.path,
+      success: function(result) {
+        if (params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase) {
+        if (params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
+
+  module.get_user_config = function(params) {
+    $.ajax({
+      contentType: 'application/json',
+      type: 'GET',
+      url: server_root + 'remotes/'+params.hostname+'/get-user-config',
+      success: function(result) {
+        if (params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase) {
+        if (params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
+
+  module.set_user_config = function(params) {
+    $.ajax({
+      contentType: 'application/json',
       data: JSON.stringify({
-        sid: params.sid,
-        jid: params.jid,
-        path: params.path
+        config: params.config
       }),
       type: 'POST',
-      url: server_root + 'remotes/get-job-output',
+      url: server_root + 'remotes/'+params.hostname+'/set-user-config',
       success: function(result) {
         if (params.success)
           params.success(result);
@@ -803,7 +962,6 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     $.ajax({
       contentType: 'application/json',
       data: JSON.stringify({
-        sid: params.sid,
         wckey: params.wckey,
         nnodes: params.nnodes,
         partition: params.partition,
@@ -814,10 +972,11 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         time_minutes: params.time_minutes,
         time_seconds: params.time_seconds,
         fn: params.fn,
-        fn_params: params.fn_params
+        fn_params: params.fn_params,
+        uid: params.uid
       }),
       type: 'POST',
-      url: server_root + 'remotes/run-agent-function',
+      url: server_root + 'remotes/'+params.hostname+'/run-agent-function',
       success: function(response) {
         if (params.success)
           params.success(response);
@@ -839,7 +998,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
       }),
       type: "POST",
-      url: server_root + "remotes/" + params.sid + "/browse" + params.path,
+      url: server_root + "remotes/" + params.hostname + "/browse" + params.path,
       success: function(result)
       {
         if(params.success)
@@ -849,7 +1008,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
   };
 
@@ -861,7 +1020,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       data: JSON.stringify(
       {
         "content-type": params["content-type"],
-        "images": params.images,
+        "images": params.images
       }),
       type: "POST",
       url: server_root + "remotes/" + params.sid + "/videos",
@@ -874,9 +1033,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.post_uploads = function(params)
   {
@@ -888,7 +1047,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         "mid": params.mid,
         "input": params.input,
         "parser": params.parser,
-        "aids": params.aids,
+        "aids": params.aids
       }),
       type: "POST",
       url: server_root + "uploads",
@@ -901,9 +1060,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.post_upload_finished = function(params)
   {
@@ -912,12 +1071,11 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       contentType: "application/json",
       data: JSON.stringify(
       {
-        "uploaded": params.uploaded,
+        "uploaded": params.uploaded
       }),
       type: "POST",
       url: server_root + "uploads/" + params.uid + "/finished",
-      success: function(result)
-      {
+      success: function () {
         if(params.success)
           params.success();
       },
@@ -925,9 +1083,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.put_model_inputs = function(params)
   {
@@ -937,7 +1095,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       data: JSON.stringify(
       {
         sid: params.sid,
-        "deep-copy": params["deep-copy"] || false,
+        "deep-copy": params["deep-copy"] || false
       }),
       type: "PUT",
       url: server_root + "models/" + params.mid + "/inputs",
@@ -950,9 +1108,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.put_model_parameter = function(params)
   {
@@ -962,7 +1120,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       data: JSON.stringify(
       {
         value: params.value,
-        input: params.input === undefined ? true: params.input ? true: false,
+        input: params.input === undefined ? true: params.input ? true: false
       }),
       type: "PUT",
       url: server_root + "models/" + params.mid + "/parameters/" + params.aid,
@@ -975,9 +1133,9 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
 
   module.put_project = function(params)
   {
@@ -1005,7 +1163,26 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
+      }
+    });
+  };
+
+  module.delete_project_cache = function(params)
+  {
+    $.ajax(
+    {
+      type: "DELETE",
+      url: server_root + "projects/" + params.pid + "/delete-cache",
+      success: function()
+      {
+        if(params.success)
+          params.success();
       },
+      error: function(request, status, reason_phrase)
+      {
+        if(params.error)
+          params.error(request, status, reason_phrase);
+      }
     });
   };
 
@@ -1037,20 +1214,23 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
   };
 
   module.put_upload_file_part = function(params)
   {
+
     var data = new FormData();
-    if(params.sid && params.path)
+    if(params.hostname && params.path)
     {
-      data.append("sid", params.sid);
+//      console.log("if? sid "+params.sid+"path "+params.path+"file "+params.file);
+      data.append("hostname", params.hostname);
       data.append("path", params.path);
     }
     else if(params.file)
     {
+//      console.log("if else? sid "+params.sid+"path "+params.path+"file "+params.file);
       data.append("file", params.file);
     }
 
@@ -1070,9 +1250,45 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       {
         if(params.error)
           params.error(request, status, reason_phrase);
-      },
+      }
     });
-  }
+  };
+
+  module.sign_out = function(params)
+  {
+    $.ajax(
+    {
+      type: "DELETE",
+      url: server_root + "logout",
+      success: function()
+      {
+        if(params.success)
+          params.success();
+      },
+      error: function(request, status, reason_phrase)
+      {
+        if(params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
+
+  module.job_time = function(params)
+  {
+    $.ajax({
+      contentType: 'application/json',
+      type: 'GET',
+      url: server_root + 'remotes/'+params.nodes+"/"+params.tasks+"/"+params.size+"/job-time",
+      success: function(result) {
+        if (params.success)
+          params.success(result);
+      },
+      error: function(request, status, reason_phrase) {
+        if (params.error)
+          params.error(request, status, reason_phrase);
+      }
+    });
+  };
 
   return module;
 });

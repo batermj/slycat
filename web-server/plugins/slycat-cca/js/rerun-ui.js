@@ -15,18 +15,50 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
     });
     component.attributes = mapping.fromJS([]);
     component.scale_inputs = ko.observable(false);
+    component.row_count = ko.observable(null);
 
-    client.get_model_table_metadata(
-    {
+    client.get_model_arrayset_metadata({
       mid: component.original._id(),
       aid: "data-table",
-      success: function(metadata)
-      {
+      arrays: "0",
+      statistics: "0/...",
+      success: function(metadata) {
+        component.row_count(metadata.arrays[0].shape[0]); // Set number of rows
         var attributes = [];
-        for(var i = 0; i != metadata["column-names"].length; ++i)
-          attributes.push({name:metadata["column-names"][i], type:metadata["column-types"][i], input:false, output:false})
+        var name = null;
+        var type = null;
+        var constant = null;
+        var string = null;
+        var tooltip = null;
+        for(var i = 0; i != metadata.arrays[0].attributes.length; ++i)
+        {
+          name = metadata.arrays[0].attributes[i].name;
+          type = metadata.arrays[0].attributes[i].type;
+          constant = metadata.statistics[i].unique == 1;
+          string = type == "string";
+          tooltip = "";
+          if(string)
+          {
+            tooltip = "This variable's values contain strings, so it cannot be included in the analysis.";
+          }
+          else if(constant)
+          {
+            tooltip = "This variable's values are all identical, so it cannot be included in the analysis.";
+          }
+          attributes.push({
+            name: name, 
+            type: type, 
+            constant: constant,
+            disabled: constant || string,
+            Classification: 'Neither',
+            hidden: false,
+            selected: false,
+            lastSelected: false,
+            tooltip: tooltip
+          });
+        }
         mapping.fromJS(attributes, component.attributes);
-
+        
         client.get_model_parameter(
         {
           mid: component.original._id(),
@@ -34,7 +66,9 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
           success: function(value)
           {
             for(var i = 0; i != value.length; ++i)
-              component.attributes()[value[i]].input(true);
+            {
+              component.attributes()[value[i]].Classification('Input');
+            }
           }
         });
 
@@ -45,7 +79,9 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
           success: function(value)
           {
             for(var i = 0; i != value.length; ++i)
-              component.attributes()[value[i]].output(true);
+            {
+              component.attributes()[value[i]].Classification('Output');
+            }
           }
         });
       }
@@ -60,18 +96,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
         component.scale_inputs(value);
       }
     });
-
-    component.set_input = function(attribute)
-    {
-      attribute.output(false);
-      return true;
-    }
-
-    component.set_output = function(attribute)
-    {
-      attribute.input(false);
-      return true;
-    }
 
     component.cancel = function()
     {
@@ -96,7 +120,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
             sid: component.original._id(),
             success: function()
             {
-              component.tab(1);
+              // component.tab(1);
             }
           });
         },
@@ -104,6 +128,8 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       });
     }
 
+    // Create a model as soon as the dialog loads. We rename, change description and marking later.
+    component.create_model();
 
     component.go_to_model = function() {
       location = server_root + 'models/' + component.model._id();
@@ -115,51 +141,94 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "knockout", 
       var output_columns = [];
       for(var i = 0; i != component.attributes().length; ++i)
       {
-        if(component.attributes()[i].input())
+        if(component.attributes()[i].Classification() == 'Input')
           input_columns.push(i);
-        if(component.attributes()[i].output())
+        if(component.attributes()[i].Classification() == 'Output')
           output_columns.push(i);
       }
 
-      client.put_model_parameter(
+      if( input_columns.length >= component.row_count() || output_columns.length >= component.row_count() )
+      {
+        dialog.dialog({
+          message:"The number of inputs must be less than " + component.row_count() + 
+                  ". The number of outputs must be less than " + component.row_count() + 
+                  ". You have selected " + input_columns.length +
+                  " inputs and " + output_columns.length + " outputs."
+        });
+      }
+      else if( input_columns.length == 0 )
+      {
+        dialog.dialog({
+          message:"The number of inputs must be at least one."
+        });
+      }
+      else if( output_columns.length == 0 )
+      {
+        dialog.dialog({
+          message:"The number of outputs must be at least one."
+        });
+      }
+      else
+      {
+        client.put_model_parameter(
+        {
+          mid: component.model._id(),
+          aid: "input-columns",
+          value: input_columns,
+          input: true,
+          success: function()
+          {
+            client.put_model_parameter(
+            {
+              mid: component.model._id(),
+              aid: "output-columns",
+              value: output_columns,
+              input: true,
+              success: function()
+              {
+                client.put_model_parameter(
+                {
+                  mid: component.model._id(),
+                  aid: "scale-inputs",
+                  value: component.scale_inputs(),
+                  input: true,
+                  success: function()
+                  {
+                    component.tab(1);
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    }
+
+    component.name_model = function() {
+      client.put_model(
       {
         mid: component.model._id(),
-        aid: "input-columns",
-        value: input_columns,
-        input: true,
+        name: component.model.name(),
+        description: component.model.description(),
+        marking: component.model.marking(),
         success: function()
         {
-          client.put_model_parameter(
-          {
+          client.post_model_finish({
             mid: component.model._id(),
-            aid: "output-columns",
-            value: output_columns,
-            input: true,
-            success: function()
-            {
-              client.put_model_parameter(
-              {
-                mid: component.model._id(),
-                aid: "scale-inputs",
-                value: component.scale_inputs(),
-                input: true,
-                success: function()
-                {
-                  client.post_model_finish(
-                  {
-                    mid: component.model._id(),
-                    success: function()
-                    {
-                      component.tab(2);
-                    }
-                  });
-                }
-              });
+            success: function() {
+              component.go_to_model();
             }
           });
-        }
+        },
+        error: dialog.ajax_error("Error updating model."),
       });
-    }
+    };
+
+    component.back = function() {
+      var target = component.tab();
+      target--;
+      component.tab(target);
+    };
 
     return component;
   }

@@ -160,6 +160,13 @@ $.widget("parameter_image.table",
       editCommandHandler : self._editCommandHandler,
     });
 
+    self.data.onDataLoaded.subscribe(function (e, args) {
+      for (var i = args.from; i <= args.to; i++) {
+        self.grid.invalidateRow(i);
+      }
+      self.grid.render();
+    });
+
     var header_buttons = new Slick.Plugins.HeaderButtons();
     header_buttons.onCommand.subscribe(function(e, args)
     {
@@ -392,13 +399,13 @@ $.widget("parameter_image.table",
     {
       if(self.options.images.indexOf(self.columns[i].id) == -1 && self.options.metadata["column-count"]-1 != self.columns[i].id){
         if( self.columns[i].id == self.options["y-variable"]){
-          self.columns[i].header.buttons[0].cssClass = "icon-y-on";
-          self.columns[i].header.buttons[0].tooltip = "Current y variable";
-          self.columns[i].header.buttons[0].command = "";
+          self.columns[i].header.buttons[2].cssClass = "icon-y-on";
+          self.columns[i].header.buttons[2].tooltip = "Current y variable";
+          self.columns[i].header.buttons[2].command = "";
         } else {
-          self.columns[i].header.buttons[0].cssClass = "icon-y-off";
-          self.columns[i].header.buttons[0].tooltip = "Set as y variable";
-          self.columns[i].header.buttons[0].command = "y-on";
+          self.columns[i].header.buttons[2].cssClass = "icon-y-off";
+          self.columns[i].header.buttons[2].tooltip = "Set as y variable";
+          self.columns[i].header.buttons[2].command = "y-on";
         }
         self.grid.updateColumnHeader(self.columns[i].id);
       }
@@ -468,9 +475,13 @@ $.widget("parameter_image.table",
     self.analysis_columns = self.inputs.concat(self.outputs);
     self.indexOfIndex = parameters.indexOfIndex;
     self.hidden_simulations = parameters.hidden_simulations;
+    self.ranked_indices = {};
 
     self.pages = {};
+    self.pages_in_progress = {};
     self.page_size = 50;
+
+    self.onDataLoaded = new Slick.Event();
 
     self.getLength = function()
     {
@@ -484,8 +495,14 @@ $.widget("parameter_image.table",
       var page = Math.floor(index / self.page_size);
       var page_begin = page * self.page_size;
 
+      if(self.pages_in_progress[page])
+      {
+        return null;
+      }
+
       if(!(page in self.pages))
       {
+        self.pages_in_progress[page] = true;
         var row_begin = page_begin;
         var row_end = (page + 1) * self.page_size;
 
@@ -493,20 +510,27 @@ $.widget("parameter_image.table",
         if(self.sort_column !== null && self.sort_order !== null)
         {
           var sort_column = "a" + self.sort_column;
+          var sort_order = self.sort_order;
+          if(sort_order == 'ascending')
+          {
+            sort_order = 'asc';
+          }
+          else if(sort_order == 'descending')
+          {
+            sort_order = 'desc';
+          }
           if(self.sort_column == self.metadata["column-count"]-1)
             sort_column = "index(0)";
-          sort = "/order: rank(" + sort_column + ', "' + self.sort_order + '")';
+          sort = "/order: rank(" + sort_column + ', "' + sort_order + '")';
         }
 
         $.ajax(
         {
           type : "GET",
-          url : self.server_root + "models/" + self.mid + "/arraysets/" + self.aid + "/data?hyperchunks=0/" + column_begin + ":" + (column_end - 1) + "| index(0)" + sort + "/" + row_begin + ":" + row_end,
-          async : false,
+          url : self.server_root + "models/" + self.mid + "/arraysets/" + self.aid + "/data?hyperchunks=0/" + column_begin + ":" + (column_end - 1) + "|index(0)" + sort + "/" + row_begin + ":" + row_end,
           success : function(data)
           {
             self.pages[page] = [];
-            //var arrayPage = [];
             for(var i=0; i < data[0].length; i++)
             {
               result = {};
@@ -516,12 +540,15 @@ $.widget("parameter_image.table",
               }
               self.pages[page].push(result);
             }
+            self.pages_in_progress[page] = false;
+            self.onDataLoaded.notify({from: row_begin, to: row_end});
           },
           error: function(request, status, reason_phrase)
           {
             console.log("error", request, status, reason_phrase);
           }
         });
+        return null;
       }
 
       return self.pages[page][index - page_begin];
@@ -529,16 +556,22 @@ $.widget("parameter_image.table",
 
     self.getItemMetadata = function(index)
     {
+      var page = Math.floor(index / self.page_size);
+      if((self.pages_in_progress[page]) || !(page in self.pages))
+      {
+        return null;
+      }
+
       var row = this.getItem(index);
       var column_end = self.analysis_columns.length;
       var cssClasses = "";
       for(var i=0; i != column_end; i++) {
         if(row[ self.analysis_columns[i] ]==null) {
-          cssClasses += "nullRow";
+          cssClasses += "nullRow ";
         }
       }
       if( $.inArray( row[self.indexOfIndex], self.hidden_simulations ) != -1 ) {
-        cssClasses += "hiddenRow";
+        cssClasses += "hiddenRow ";
       }
       if(cssClasses != "")
         return {"cssClasses" : cssClasses};
@@ -548,7 +581,9 @@ $.widget("parameter_image.table",
     self.set_sort = function(column, order)
     {
       if(column == self.sort_column && order == self.sort_order)
+      {
         return;
+      }
       self.sort_column = column;
       self.sort_order = order;
       self.pages = {};
@@ -561,29 +596,74 @@ $.widget("parameter_image.table",
         callback([]);
         return;
       }
-
-      var sort = "";
-      if(self.sort_column !== null && self.sort_order !== null)
+      // We have no sort column or order, so just returning the same rows as were asked for since they're in the same order
+      if(self.sort_column == null || self.sort_order == null)
       {
-        var sort_order = self.sort_order;
-        if(sort_order == "asc")
-          sort_order = "ascending";
-        else if(sort_order == "desc")
-          sort_order = "descending";
-
-        sort = "&sort=" + self.sort_column + ":" + sort_order;
+        callback(rows);
       }
-
-      var row_string = "";
-      for(var i = 0; i < rows.length; ++i)
+      else
       {
-        row_string += rows[i];
-        break
-      }
-      for(var i = 1; i < rows.length; ++i)
-      {
-        row_string += ",";
-        row_string += rows[i];
+        if(self.ranked_indices[self.sort_column])
+        {
+          // we have data for this column, so figure out what to return
+          var indices = self.ranked_indices[self.sort_column];
+          // Reverse response indexes for descending sort order
+          if(self.sort_order == 'desc')
+          {
+            var plain_array = [];
+            for(var i=0; i<indices.length; i++)
+            {
+              plain_array.push(indices[i]);
+            }
+            indices = plain_array.reverse();
+          }
+          var response = []; 
+          for(var i=0; i<rows.length; i++)
+          {
+            if(direction == "unsorted")
+            {
+              response.push( indices[ rows[i] ] );
+            }
+            else if(direction == "sorted")
+            {
+              response.push( indices.indexOf(rows[i]) );
+            }
+          }
+          callback(new Int32Array(response));
+        }
+        else
+        {
+          if( self.sort_column == self.metadata["column-count"]-1 )
+          {
+            // we are sorting by the index column, so we can just make the data we need.
+            self.ranked_indices[self.sort_column] = new Int32Array( d3.range(self.metadata["row-count"]) );
+            self.get_indices(direction, rows, callback);
+          }
+          else
+          {
+            // we have no data for this column, so go retrieve it and call this function again.
+            var request = new XMLHttpRequest();
+            request.open("GET", self.server_root + "models/" + self.mid + "/arraysets/data-table/data?hyperchunks=0/rank(a" + self.sort_column + ',"asc")/...&byteorder=' + (is_little_endian() ? "little" : "big") );
+            request.responseType = "arraybuffer";
+            request.direction = direction;
+            request.rows = rows;
+            request.callback = callback;
+            request.onload = function(e)
+            {
+              var indices = [];
+              var data = new Int32Array(this.response);
+              // Filtering out every other element in the reponse array, because it's full of extraneous 0 (zeros) for some reason.
+              // Need to figure out why, but this is a fix for now.
+              for(var i=0; i<data.length; i=i+2)
+              {
+                indices.push(data[i]);
+              }
+              self.ranked_indices[self.sort_column] = new Int32Array(indices);
+              self.get_indices(this.direction, this.rows, this.callback);
+            }
+            request.send();
+          }
+        }
       }
 
       function is_little_endian()
@@ -592,22 +672,11 @@ $.widget("parameter_image.table",
           this.result = ((new Uint32Array((new Uint8Array([1,2,3,4])).buffer))[0] === 0x04030201);
         return this.result;
       }
-
-      var request = new XMLHttpRequest();
-      request.open("GET", self.server_root + "models/" + self.mid + "/tables/" + self.aid + "/arrays/0/" + direction + "-indices?rows=" + row_string + "&index=Index&byteorder=" + (is_little_endian() ? "little" : "big") + sort);
-      request.responseType = "arraybuffer";
-      request.callback = callback;
-      request.onload = function(e)
-      {
-        this.callback(new Int32Array(this.response));
-      }
-      request.send();
     }
 
     self.invalidate = function()
     {
       self.pages = {};
-
     }
   },
 

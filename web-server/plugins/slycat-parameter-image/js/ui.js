@@ -51,7 +51,7 @@ var controls_ready = false;
 var sliders_ready = false;
 var image_uri = document.createElement("a");
 var layout = null;
-
+var filterxhr = null;
 var intercom = Intercom.getInstance();
 
 intercom.on('selection', function(data) {
@@ -108,12 +108,15 @@ $("#model-pane").layout(
   center:
   {
     resizeWhileDragging: false,
-    onresize: function() {
-      $("#scatterplot").scatterplot("option", {
-        width: $("#scatterplot-pane").width(),
-        height: $("#scatterplot-pane").height()
-      });
-    },
+    onresize: function() 
+    {
+      if($("#scatterplot").data("parameter_image-scatterplot")) {
+        $("#scatterplot").scatterplot("option", {
+          width: $("#scatterplot-pane").width(),
+          height: $("#scatterplot-pane").height()
+        });
+      }
+    }
   }
 });
 
@@ -338,6 +341,10 @@ function metadata_loaded()
       success : function(result)
       {
         x = result;
+        if(table_metadata["column-types"][x_index]=="string")
+        {
+          x = x[0];
+        }
         setup_scatterplot();
         setup_table();
       },
@@ -353,6 +360,10 @@ function metadata_loaded()
       success : function(result)
       {
         y = result;
+        if(table_metadata["column-types"][y_index]=="string")
+        {
+          y = y[0];
+        }
         setup_scatterplot();
         setup_table();
       },
@@ -384,6 +395,10 @@ function metadata_loaded()
         success : function(result)
         {
           v = result;
+          if(table_metadata["column-types"][v_index]=="string")
+          {
+            v = v[0];
+          }
           update_current_colorscale();
           setup_scatterplot();
           setup_table();
@@ -392,11 +407,11 @@ function metadata_loaded()
       });
     }
 
-    images_index = image_columns[0];
+    images_index = -1;
     if("images-selection" in bookmark)
       images_index = bookmark["images-selection"];
     setup_table();
-    if(image_columns.length > 0)
+    if(image_columns.length > 0 && images_index > -1)
     {
       $.ajax(
       {
@@ -934,21 +949,29 @@ function handle_color_variable_change(variable)
 function handle_image_variable_change(variable)
 {
   images_index = Number(variable);
+  images = [];
 
-
-  // Get entire data column for current image variable and pass it to scatterplot and dendrogram
-  $.ajax(
+  if(images_index > -1)
   {
-    type : "GET",
-    url : server_root + "models/" + model_id + "/arraysets/data-table/data?hyperchunks=0/" + images_index + "/0:" + table_metadata["row-count"],
-    success : function(result)
+    // Get entire data column for current image variable and pass it to scatterplot and dendrogram
+    $.ajax(
     {
-      images = result[0];
-      // Passing new images to both scatterplot and dendrogram
-      $("#scatterplot").scatterplot("option", "images", images);
-    },
-    error: artifact_missing
-  });
+      type : "GET",
+      url : server_root + "models/" + model_id + "/arraysets/data-table/data?hyperchunks=0/" + images_index + "/0:" + table_metadata["row-count"],
+      success : function(result)
+      {
+        images = result[0];
+        // Passing new images to scatterplot
+        $("#scatterplot").scatterplot("option", "images", images);
+      },
+      error: artifact_missing
+    });
+  }
+  else
+  {
+    // Passing new images to scatterplot
+    $("#scatterplot").scatterplot("option", "images", images);
+  }
 
   // Log changes to and bookmark the images variable ...
   images_selection_changed(images_index);
@@ -975,6 +998,10 @@ function update_v(variable)
     success : function(result)
     {
       v = result;
+      if(table_metadata["column-types"][variable]=="string")
+      {
+        v = v[0];
+      }
       update_widgets_after_color_variable_change();
     },
     error : artifact_missing
@@ -985,7 +1012,11 @@ function update_widgets_after_color_variable_change()
 {
   update_current_colorscale();
   $("#table").table("option", "colorscale", colorscale);
-  $("#scatterplot").scatterplot("update_color_scale_and_v", {v : v, v_string : table_metadata["column-types"][v_index]=="string", colorscale : colorscale});
+  $("#scatterplot").scatterplot("update_color_scale_and_v", {
+    v : v, 
+    v_string : table_metadata["column-types"][v_index]=="string", 
+    colorscale : colorscale
+  });
   $("#scatterplot").scatterplot("option", "v_label", table_metadata["column-names"][v_index]);
 }
 
@@ -995,16 +1026,21 @@ function update_widgets_when_hidden_simulations_change()
   if(auto_scale)
   {
     update_current_colorscale();
-    $("#table").table("option", {hidden_simulations : hidden_simulations, colorscale : colorscale});
+    if($("#table").data("parameter_image-table"))
+      $("#table").table("option", {hidden_simulations : hidden_simulations, colorscale : colorscale});
     // TODO this will result in 2 updates to canvas, one to redraw points according to hidden simulations and another to color them according to new colorscale. Need to combine this to a single update when converting to canvas.
-    $("#scatterplot").scatterplot("option", {hidden_simulations : hidden_simulations, colorscale : colorscale});
+    if($("#scatterplot").data("parameter_image-scatterplot"))
+      $("#scatterplot").scatterplot("option", {hidden_simulations : hidden_simulations, colorscale : colorscale});
   }
   else
   {
-    $("#table").table("option", "hidden_simulations", hidden_simulations);
-    $("#scatterplot").scatterplot("option", "hidden_simulations", hidden_simulations);
+    if($("#table").data("parameter_image-table"))
+      $("#table").table("option", "hidden_simulations", hidden_simulations);
+    if($("#scatterplot").data("parameter_image-scatterplot"))
+      $("#scatterplot").scatterplot("option", "hidden_simulations", hidden_simulations);
   }
-  $("#controls").controls("option", "hidden_simulations", hidden_simulations);
+  if($("#controls").data("parameter_image-controls"))
+    $("#controls").controls("option", "hidden_simulations", hidden_simulations);
 }
 
 function update_current_colorscale()
@@ -1160,7 +1196,11 @@ function update_scatterplot_x(variable)
     attribute : variable,
     success : function(result)
     {
-      $("#scatterplot").scatterplot("option", {x_string: table_metadata["column-types"][variable]=="string", x: result, x_label:table_metadata["column-names"][variable]});
+      $("#scatterplot").scatterplot("option", {
+        x_string: table_metadata["column-types"][variable]=="string", 
+        x: table_metadata["column-types"][variable]=="string" ? result[0] : result, 
+        x_label:table_metadata["column-names"][variable]
+      });
     },
     error : artifact_missing
   });
@@ -1176,7 +1216,11 @@ function update_scatterplot_y(variable)
     attribute : variable,
     success : function(result)
     {
-      $("#scatterplot").scatterplot("option", {y_string: table_metadata["column-types"][variable]=="string", y: result, y_label:table_metadata["column-names"][variable]});
+      $("#scatterplot").scatterplot("option", {
+        y_string: table_metadata["column-types"][variable]=="string", 
+        y: table_metadata["column-types"][variable]=="string" ? result[0] : result, 
+        y_label:table_metadata["column-names"][variable]
+      });
     },
     error : artifact_missing
   });
@@ -1236,7 +1280,10 @@ function active_filters_ready()
 
   filter_manager.active_filters.subscribe(function(newValue) {
     filters_changed(newValue);
-    $("#controls").controls("option", "disable_hide_show",  newValue.length > 0);
+    if($("#controls").data("parameter_image-controls"))
+    {
+      $("#controls").controls("option", "disable_hide_show",  newValue.length > 0);
+    }
   });
 }
 
@@ -1289,11 +1336,18 @@ function filters_changed(newValue)
   // We have one or more filters
   if( !(filter_expression == null || filter_expression == "") )
   {
-    $.ajax(
+    // Abort existing ajax request
+    if(filterxhr && filterxhr.readyState != 4)
     {
-      type : "GET",
-      url : self.server_root + "models/" + model_id + "/arraysets/data-table/data?hyperchunks=0/index(0)|" + filter_expression + "/...",
-      async : false,
+      filterxhr.abort();
+      console.log('aborted');
+    }
+    filterxhr = $.ajax(
+    {
+      type : "POST",
+      url : self.server_root + "models/" + model_id + "/arraysets/data-table/data",
+      data: JSON.stringify({"hyperchunks": "0/index(0)|" + filter_expression + "/..."}),
+      contentType: "application/json",
       success : function(data)
       {
         var filter_indices = data[0];

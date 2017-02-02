@@ -33,9 +33,13 @@ rights in this software.
 
 #cluster-pane
 {
-  overflow: auto;
-  color: #665;
-  font-size: small;
+  z-index: 3 !important; /* Required to make bootstrap dropdowns appear over lower panes */
+}
+#controls {
+  margin: 2px 0px;
+}
+.center {
+  text-align: center;
 }
 
 #cluster-viewer
@@ -101,6 +105,11 @@ rights in this software.
   cursor: pointer;
 }
 
+a 
+{
+  cursor: pointer;
+}
+
 #dendrogram-viewer .node .subtree path
 {
   stroke: none;
@@ -150,7 +159,9 @@ rights in this software.
 }
 
 /* Waveform Progress Indicator */
-#waveform-progress {
+#waveform-progress,
+#waveform-selection-progress
+{
     background-color: transparent;
     position: absolute;
     left: 50%;
@@ -159,6 +170,26 @@ rights in this software.
     height: 200px;
     margin: -100px 0 0 -100px;
     display: none;
+}
+#waveform-selection-progress
+{
+  z-index: 1;
+}
+#waveform-selector-progress {
+  background-color: transparent;
+  position: absolute;
+  left: 0px;
+  top: 3px;
+  width: 100%;
+  height: 15px;
+  text-align: center;
+  display: none;
+}
+#waveform-selector-progress-wrapper {
+  display: none;
+}
+#waveform-pane:hover #waveform-selector-progress-wrapper {
+  display: block;
 }
 /* Use these colors for the dark night mode */
 #waveform-viewer.nightMode,
@@ -232,32 +263,19 @@ rights in this software.
   shape-rendering: crispedges;
 }
 
-#color-switcher {
-  float: right;
-  margin: 9px;
+#color-switcher ul.dropdown-menu
+{
+  background-color: #F2F2F2;
 }
-#color-switcher .label {
-  font-weight: bold;
+.bootstrap-styles #color-switcher .dropdown-menu > li > a:hover
+{
+  background-color: #E4E4E4;
 }
-.cca #color-switcher {
-  position: absolute;
-  right: 0px;
-  bottom: 5px;
+.bootstrap-styles #color-switcher .dropdown-menu > .active > a:hover
+{
+  background-color: #337AB7;
 }
-#color-switcher .color {
-  background-color: #DBD9EB;
-  padding: 4px;
-}
-.cca #color-switcher .color {
-  background-color: white;
-}
-#color-switcher .color:hover {
-  cursor: pointer;
-}
-#color-switcher .selected:hover {
-  cursor: default;
-}
-#color-switcher .selected {
-  background-color: #7767B0 !important;
-  color: white;
+#controls  ul.dropdown-menu  {
+  max-height: 300px;
+  overflow-y: auto;
 }
