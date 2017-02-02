@@ -108,7 +108,8 @@ def js_bundle():
                                                                                   "js/slycat-3d-viewer.js",
                                                                                   "js/slycat-remote-interface.js",
                                                                                   "js/slycat-job-checker.js",
-                                                                                  "js/intercom.amd.min.js"
+                                                                                  "js/intercom.amd.min.js",
+                                                                                  "js/uuid.js"
                                                                               ])
     return js_bundle._bundle
 

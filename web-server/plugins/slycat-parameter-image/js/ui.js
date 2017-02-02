@@ -1,16 +1,17 @@
 define("slycat-parameter-image-model", 
   ["slycat-server-root", "lodash", "knockout", "knockout-mapping", "slycat-web-client", 
    "slycat-bookmark-manager", "slycat-dialog", "slycat-parameter-image-note-manager", 
-   "slycat-parameter-image-filter-manager", "d3", "URI", "Intercom", "slycat-parameter-image-scatterplot", 
+   "slycat-parameter-image-filter-manager", "d3", "URI", "Intercom", "UUID", "slycat-parameter-image-scatterplot", 
    "slycat-parameter-image-controls", "slycat-parameter-image-table", "slycat-color-switcher", 
    "domReady!"], 
-  function(server_root, _, ko, mapping, client, bookmark_manager, dialog, NoteManager, FilterManager, d3, URI, Intercom)
+  function(server_root, _, ko, mapping, client, bookmark_manager, dialog, NoteManager, FilterManager, d3, URI, Intercom, UUID)
 {
 //////////////////////////////////////////////////////////////////////////////////////////
 // Setup global variables.
 //////////////////////////////////////////////////////////////////////////////////////////
 
 var model_id = URI(window.location).segment(-1);
+var uuid = UUID.uuid();
 var input_columns = null;
 var output_columns = null;
 var image_columns = null;
@@ -55,10 +56,13 @@ var filterxhr = null;
 var intercom = Intercom.getInstance();
 
 intercom.on('selection', function(data) {
-  var sims = data.selected_simulations;
-  $("#scatterplot").scatterplot("option", "selection",  sims);
-  $("#controls").controls("option", "selection",  sims);
-  $("#table").table("option", "row-selection", sims);
+  if(data.model_id == model_id && data.uuid == uuid)
+  {
+    var sims = data.selected_simulations;
+    $("#scatterplot").scatterplot("option", "selection",  sims);
+    $("#controls").controls("option", "selection",  sims);
+    $("#table").table("option", "row-selection", sims);
+  }
 });
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1115,7 +1119,7 @@ function selected_simulations_changed(selection)
   bookmarker.updateState( {"simulation-selection" : selection} );
   selected_simulations = selection;
   // Emit coordination signal
-  intercom.emit('selection', {selected_simulations: selection});
+  intercom.emit('selection', {selected_simulations: selection, model_id: model_id, uuid: uuid});
 }
 
 function x_selection_changed(variable)
