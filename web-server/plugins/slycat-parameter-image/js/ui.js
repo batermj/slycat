@@ -527,15 +527,6 @@ function setup_table()
         temp.push(selection[i]);
 
       selected_simulations_changed(temp);
-      $("#scatterplot").scatterplot("option", "selection",  temp);
-      $("#controls").controls("option", "selection",  temp);
-    });
-
-    // Changing the scatterplot selection updates the table row selection and controls ..
-    $("#scatterplot").bind("selection-changed", function(event, selection)
-    {
-      $("#table").table("option", "row-selection", selection);
-      $("#controls").controls("option", "selection", selection);
     });
 
     // Changing the x variable updates the table ...
@@ -1117,7 +1108,6 @@ function selected_simulations_changed(selection)
     url : server_root + "events/models/" + model_id + "/select/simulation/count/" + selection.length
   });
   bookmarker.updateState( {"simulation-selection" : selection} );
-  selected_simulations = selection;
   // Emit coordination signal
   intercom.emit('selection', {selected_simulations: selection, model_id: model_id, uuid: uuid});
 }

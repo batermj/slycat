@@ -453,31 +453,35 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     var self = this;
 
     //console.log("parameter_image.scatterplot._setOption()", key, value);
-    self.options[key] = value;
 
     if(key == "indices")
     {
+      self.options[key] = value;
       self._filterIndices();
       self._schedule_update({update_indices:true, render_selection:true});
     }
 
     else if(key == "x_label")
     {
+      self.options[key] = value;
       self._schedule_update({update_x_label:true});
     }
 
     else if(key == "y_label")
     {
+      self.options[key] = value;
       self._schedule_update({update_y_label:true});
     }
 
     else if(key == "v_label")
     {
+      self.options[key] = value;
       self._schedule_update({update_v_label:true});
     }
 
     else if(key == "x")
     {
+      self.options[key] = value;
       if(self.options["auto-scale"])
       {
         self.options.filtered_x = self._filterValues(self.options.x);
@@ -494,6 +498,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
     else if(key == "y")
     {
+      self.options[key] = value;
       if(self.options["auto-scale"])
       {
         self.options.filtered_y = self._filterValues(self.options.y);
@@ -510,6 +515,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
     else if(key == "v")
     {
+      self.options[key] = value;
       if(self.options["auto-scale"])
       {
         self.options.filtered_v = self._filterValues(self.options.v);
@@ -524,41 +530,52 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
     else if(key == "images")
     {
+      self.options[key] = value;
     }
 
     else if(key == "selection")
     {
+      if(_.isEqual(self.options[key], value))
+        return;
+
+      self.options[key] = value;
       self._filterIndices();
       self._schedule_update({render_selection:true});
     }
 
     else if(key == "colorscale")
     {
+      self.options[key] = value;
       self._schedule_update({render_data:true, render_selection:true});
     }
 
     else if(key == "width")
     {
+      self.options[key] = value;
       self._schedule_update({update_width:true, update_x_label:true, update_x:true, update_leaders:true, render_data:true, render_selection:true});
     }
 
     else if(key == "height")
     {
+      self.options[key] = value;
       self._schedule_update({update_height:true, update_y:true, update_y_label:true, update_leaders:true, render_data:true, render_selection:true, update_legend_position:true, update_legend_axis:true, update_v_label:true,});
     }
 
     else if(key == "border")
     {
+      self.options[key] = value;
       self._schedule_update({update_x:true, update_y:true, update_leaders:true, render_data:true, render_selection:true, update_legend_position:true, update_v_label:true,});
     }
 
     else if(key == "gradient")
     {
+      self.options[key] = value;
       self._schedule_update({update_legend_colors:true, });
     }
 
     else if(key == "hidden_simulations")
     {
+      self.options[key] = value;
       self._filterIndices();
       if(self.options["auto-scale"])
       {
@@ -582,6 +599,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
 
     else if(key == "auto-scale")
     {
+      self.options[key] = value;
       if(self.options["auto-scale"])
       {
         self.options.filtered_x = self._filterValues(self.options.x);

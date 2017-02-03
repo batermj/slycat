@@ -6,7 +6,7 @@ rights in this software.
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Slickgrid-based data table widget, for use with the CCA model.
-define("slycat-parameter-image-table", ["d3"], function(d3) {
+define("slycat-parameter-image-table", ["d3", "lodash"], function(d3, _) {
 $.widget("parameter_image.table",
 {
   options:
@@ -267,7 +267,7 @@ $.widget("parameter_image.table",
     });
     self.grid.onHeaderClick.subscribe(function (e, args)
     {
-      if( !self._array_equal([args.column.field], self.options["variable-selection"]) && 
+      if( !_.isEqual([args.column.field], self.options["variable-selection"]) && 
           self.options.images.indexOf(args.column.field) == -1
         )
       {
@@ -317,9 +317,8 @@ $.widget("parameter_image.table",
 
     if(key == "row-selection")
     {
-      // Unexpectedly at this point self.options[key] has already been set to value, so this always returns even when the row-selection is unique
-      // if(self._array_equal(self.options[key], value))
-      //   return;
+      if(_.isEqual(self.options[key], value))
+        return;
 
       self.options[key] = value;
       self.data.get_indices("sorted", value, function(sorted_rows)
@@ -333,7 +332,7 @@ $.widget("parameter_image.table",
     }
     else if(key == "variable-selection")
     {
-      if(self._array_equal(self.options[key], value))
+      if(_.isEqual(self.options[key], value))
         return;
 
       self.options[key] = value;
@@ -678,11 +677,6 @@ $.widget("parameter_image.table",
     {
       self.pages = {};
     }
-  },
-
-  _array_equal: function(a, b)
-  {
-    return $(a).not(b).length == 0 && $(b).not(a).length == 0;
   },
 });
 });
