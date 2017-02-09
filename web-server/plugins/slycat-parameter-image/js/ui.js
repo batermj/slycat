@@ -60,10 +60,17 @@ var intercom = Intercom.getInstance();
 intercom.on('selection', function(data) {
   if(data.model_id == model_id && data.uuid == uuid)
   {
-    var sims = data.selected_simulations;
-    $("#scatterplot").scatterplot("option", "selection",  sims);
-    $("#controls").controls("option", "selection",  sims);
-    $("#table").table("option", "row-selection", sims);
+    selected_simulations = data.selected_simulations;
+    $("#scatterplot").scatterplot("option", "selection",  selected_simulations);
+    $("#controls").controls("option", "selection",  selected_simulations);
+    $("#table").table("option", "row-selection", selected_simulations);
+  }
+});
+
+intercom.on('hidden-simulations', function(data) {
+  if(data.model_id == model_id && data.uuid == uuid)
+  {
+    update_widgets_when_hidden_simulations_change();
   }
 });
 
@@ -889,7 +896,7 @@ function setup_controls()
           hidden_simulations.push(selected_simulations[i]);
         }
       }
-      update_widgets_when_hidden_simulations_change();
+      hidden_simulations_changed();
       manually_hidden_simulations = hidden_simulations.slice();
     });
 
@@ -911,11 +918,11 @@ function setup_controls()
         }
       }
 
-      update_widgets_when_hidden_simulations_change();
+      hidden_simulations_changed();
       manually_hidden_simulations = hidden_simulations.slice();
     });
 
-    // Log changes to hidden selection ...
+    // Show selection...
     $("#controls").bind("show-selection", function(event, selection)
     {
       for(var i=0; i<selected_simulations.length; i++){
@@ -924,11 +931,29 @@ function setup_controls()
           hidden_simulations.splice(index, 1);
         }
       }
-      update_widgets_when_hidden_simulations_change();
+
+      hidden_simulations_changed();
       manually_hidden_simulations = hidden_simulations.slice();
     });
 
-    // Log changes to hidden selection ...
+    // Show all...
+    $("#controls").bind("show-all", function(event, selection)
+    {
+      while(hidden_simulations.length > 0) {
+        hidden_simulations.pop();
+      }
+
+      hidden_simulations_changed();
+      manually_hidden_simulations = hidden_simulations.slice();
+    });
+
+    // Close all...
+    $("#controls").bind("close-all", function(event, selection)
+    {
+      $("#scatterplot").scatterplot("close_all_simulations");
+    });
+
+    // Pin selection...
     $("#controls").bind("pin-selection", function(event, selection)
     {
       // Removing any hidden simulations from those that will be pinned
@@ -940,22 +965,6 @@ function setup_controls()
         }
       }
       $("#scatterplot").scatterplot("pin", simulations_to_pin);
-    });
-
-    // Log changes to hidden selection ...
-    $("#controls").bind("show-all", function(event, selection)
-    {
-      while(hidden_simulations.length > 0) {
-        hidden_simulations.pop();
-      }
-      update_widgets_when_hidden_simulations_change();
-      manually_hidden_simulations = hidden_simulations.slice();
-    });
-
-    // Log changes to hidden selection ...
-    $("#controls").bind("close-all", function(event, selection)
-    {
-      $("#scatterplot").scatterplot("close_all_simulations");
     });
 
   }
@@ -1087,9 +1096,14 @@ function update_widgets_after_color_variable_change()
   $("#scatterplot").scatterplot("option", "v_label", table_metadata["column-names"][v_index]);
 }
 
+function hidden_simulations_changed()
+{
+  // Emit coordination signal
+  intercom.emit('hidden-simulations', {hidden_simulations: hidden_simulations, model_id: model_id, uuid: uuid});
+}
+
 function update_widgets_when_hidden_simulations_change()
 {
-  hidden_simulations_changed();
   if(auto_scale)
   {
     update_current_colorscale();
@@ -1108,6 +1122,14 @@ function update_widgets_when_hidden_simulations_change()
   }
   if($("#controls").data("parameter_image-controls"))
     $("#controls").controls("option", "hidden_simulations", hidden_simulations);
+
+  // Logging every hidden simulation is too slow, so just log the count instead.
+  $.ajax(
+  {
+    type : "POST",
+    url : server_root + "events/models/" + model_id + "/hidden/count/" + hidden_simulations.length
+  });
+  bookmarker.updateState( { "hidden-simulations" : hidden_simulations, "manually-hidden-simulations" : manually_hidden_simulations } );
 }
 
 function update_current_colorscale()
@@ -1173,15 +1195,17 @@ function variable_sort_changed(variable, order)
 
 function selected_simulations_changed(selection)
 {
+  // Emit coordination signal
+  intercom.emit('selection', {selected_simulations: selection, model_id: model_id, uuid: uuid});
+
   // Logging every selected item is too slow, so just log the count instead.
   $.ajax(
   {
     type : "POST",
     url : server_root + "events/models/" + model_id + "/select/simulation/count/" + selection.length
   });
+
   bookmarker.updateState( {"simulation-selection" : selection} );
-  // Emit coordination signal
-  intercom.emit('selection', {selected_simulations: selection, model_id: model_id, uuid: uuid});
 }
 
 function x_selection_changed(variable)
@@ -1262,17 +1286,6 @@ function open_images_changed(selection)
     url : server_root + "events/models/" + model_id + "/select/openimages/count/" + selection.length
   });
   bookmarker.updateState( {"open-images-selection" : selection} );
-}
-
-function hidden_simulations_changed()
-{
-  // Logging every hidden simulation is too slow, so just log the count instead.
-  $.ajax(
-  {
-    type : "POST",
-    url : server_root + "events/models/" + model_id + "/hidden/count/" + hidden_simulations.length
-  });
-  bookmarker.updateState( { "hidden-simulations" : hidden_simulations, "manually-hidden-simulations" : manually_hidden_simulations } );
 }
 
 function update_scatterplot_x(variable)
