@@ -19,8 +19,15 @@ define(['slycat-server-root', 'slycat-web-client', 'slycat-dialog', 'slycat-mark
     component.xyce_timeseries_file = ko.observable('');
     component.timeseries_name = ko.observable('');
     component.cluster_sample_count = ko.observable(500);
-    component.cluster_sample_type = ko.observableArray(['uniform-paa', 'uniform-pla']);
-    component.cluster_type = ko.observableArray(['average', 'single', 'complete', 'weighted']);
+    component.timeseries_names = ko.observableArray([]);
+    component.cluster_sample_type = ko.observableArray([
+      {'text':'uniform piecewise aggregate approximation', 'value':'uniform-paa'}, 
+      {'text':'uniform piecewise linear approximation', 'value':'uniform-pla'}]);
+    component.cluster_type = ko.observableArray([
+      {'text':'average: Unweighted Pair Group Method with Arithmetic Mean (UPGMA) Algorithm', 'value':'average'},
+      {'text':'single: Nearest Point Algorithm', 'value':'single'},
+      {'text':'complete: Farthest Point Algorithm', 'value':'complete'},
+      {'text':'weighted: Weighted Pair Group Method with Arithmetic Mean (WPGMA) Algorithm','value':'weighted'}]);
     component.cluster_metric = ko.observableArray(['euclidean']);
     // SLURM parameters
     component.wckey = ko.observable('');
@@ -220,6 +227,19 @@ define(['slycat-server-root', 'slycat-web-client', 'slycat-dialog', 'slycat-mark
 
     component.select_input_file = function() {
       var file_path = component.browser_input.selection()[0];
+      console.log("calling time series name");
+      client.dummy();
+      component.timeseries_names(client.get_time_series_names({
+        hostname: component.remote.hostname(),
+        path: file_path,
+        success: function(response) {
+            component.timeseries_names(JSON.parse(response))
+            console.log(component.timeseries_names());
+        },
+        error: function(request, status, reason_phrase) {
+          console.log(reason_phrase);
+        }
+      }));
 
       if(file_path == undefined)
       {
@@ -233,7 +253,6 @@ define(['slycat-server-root', 'slycat-web-client', 'slycat-dialog', 'slycat-mark
         var in_dir = file_path.substring(0, file_path.lastIndexOf('/') + 1);
         component.input_directory(in_dir);
       }
-
       component.tab(4);
     };
 
@@ -306,9 +325,14 @@ define(['slycat-server-root', 'slycat-web-client', 'slycat-dialog', 'slycat-mark
     };
 
     component.select_hdf5_directory = function() {
-      component.hdf5_directory( component.browser_hdf5.path() );
-
-      component.tab(5);
+      dialog.confirm({
+        title: "Confirm HDF5 Directory",
+        message: "Please confirm this is the directory containing your HDF5 files: <br />" + component.browser_hdf5.path(),
+        ok: function(){
+          component.hdf5_directory( component.browser_hdf5.path() );
+          component.tab(5);
+        },
+      });
     };
 
     component.name_model = function() {
