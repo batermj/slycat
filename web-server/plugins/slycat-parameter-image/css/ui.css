@@ -926,3 +926,10 @@ a {
 {
   width: 22px;
 }
+#scatterplot-pane .fa-external-link {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  cursor: pointer;
+  z-index: 1;
+}
