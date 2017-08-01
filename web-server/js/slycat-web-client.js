@@ -147,6 +147,25 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     });
   };
 
+  module.get_project_csv_data = function(params)
+  {
+    $.ajax(
+        {
+            dataType: "json",
+            type: "GET",
+            url: server_root + "/projects/" + params.pid + "/project_data",
+            success: function (result) {
+                if (params.success)
+                    params.success(result);
+            },
+            error: function (request, status, reason_phrase) {
+                if (params.error)
+                    params.error(request, status, reason_phrase);
+            }
+        });
+  };
+
+
   /**
    *
    * @param params: object{
