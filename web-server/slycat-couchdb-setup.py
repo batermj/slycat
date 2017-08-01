@@ -214,6 +214,17 @@ design = {
         }
         """,
       },
+    "project_datas": {
+      "map": """
+        function(doc)
+        {
+          if(doc["type"] != "project_data")
+            return;
+
+          emit(doc._id, null);
+        }
+        """,
+      },
     },
 
   "validate_doc_update": """
