@@ -433,6 +433,34 @@ def post_project_models(pid):
     return {"id": mid}
 
 
+def create_project_data(mid, file):
+    """
+    When a pid along with json "model-type", "marking", "name" is sent with POST
+    creates a model and saves it to the database
+    :param pid: project ID for created model
+    :return: json {"id" : mid}
+    """
+    cherrypy.log.error("adding project data")
+    content_type = "text/csv"
+    database = slycat.web.server.database.couchdb.connect()
+    model = database.get("model", mid)
+    project = database.get("project", model["project"])
+    pid = project["_id"]
+    # slycat.web.server.authentication.require_project_writer(project)
+    did = uuid.uuid4().hex
+    data = {
+        "_id": did,
+        "type": "project_data",
+        "project": pid,
+        "mid": [mid],
+        "created": datetime.datetime.utcnow().isoformat(),
+        "creator": cherrypy.request.login,
+    }
+    database.save(data)
+    database.put_attachment(data, filename="content", content_type=content_type, content=file)
+    cherrypy.log.error("added project data")
+
+
 @cherrypy.tools.json_in(on=True)
 @cherrypy.tools.json_out(on=True)
 def post_log():
@@ -780,6 +808,7 @@ def post_model_files(mid, input=None, files=None, sids=None, paths=None, aids=No
 
     try:
         slycat.web.server.plugin.manager.parsers[parser]["parse"](database, model, input, files, aids, **kwargs)
+        create_project_data(mid, files)
     except Exception as e:
         cherrypy.log.error("Exception parsing posted files: %s" % e)
         slycat.email.send_error("slycat.web.server.handlers.py post_model_files",
