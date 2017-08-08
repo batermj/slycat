@@ -147,13 +147,16 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     });
   };
 
+
+  //server_root isn't working for some reason.
   module.get_project_csv_data = function(params)
   {
     $.ajax(
         {
             dataType: "json",
             type: "GET",
-            url: server_root + "/projects/" + params.pid + "/project_data",
+            //url: server_root + "/projects/" + params.pid + "/project_data",
+            url: params.pid + "/data",
             success: function (result) {
                 if (params.success)
                     params.success(result);
