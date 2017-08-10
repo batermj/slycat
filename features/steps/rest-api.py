@@ -644,6 +644,7 @@ def step_impl(context):
 def step_impl(context):
   nose.tools.eq_(context.unauthenticated_user, None, msg="unauthenticated user got authenticated")
 
+
 @then(u'server administrators can retrieve a list with all three projects.')
 def step_impl(context):
   require_list(context.server_admin.get_projects()["projects"], item_test=require_valid_project, includes=[context.pid2, context.pid3, context.pid4], excludes=[])
