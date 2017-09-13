@@ -367,7 +367,6 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
 
   module.get_model_arrayset_metadata = function(params)
   {
-    console.log("In get_model_arrayset_metadata and aid is: " + params.aid);
     var search = {};
     if(params.arrays)
       search.arrays = params.arrays;

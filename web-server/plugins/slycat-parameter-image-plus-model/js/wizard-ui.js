@@ -224,7 +224,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         //var file = component.browser.selection()[0];
         var fileName = component.selected_file;
         component.current_aids = fileName();
-        console.log("component.current_aids is: " + component.current_aids);
         //var file = new File([""], fileName())
         var csvData = component.csv_data();
         var blob = new Blob([ csvData ], {
@@ -445,7 +444,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
 
     component.load_table = function() {
       $('.remote-browser-continue-data').toggleClass("disabled", true);
-      console.log("The current_aids in load_table is: " + component.current_aids);
       var fileObject ={
        pid: component.project._id(),
        hostname: [component.remote.hostname()],
