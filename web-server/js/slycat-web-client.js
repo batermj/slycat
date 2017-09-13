@@ -168,6 +168,24 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         });
   };
 
+  module.get_project_file_names = function(params) {
+     $.ajax(
+        {
+            dataType: "json",
+            type: "GET",
+            //url: server_root + "/projects/" + params.pid + "/project_data",
+            url: params.pid + "/name",
+            success: function (result) {
+                if (params.success)
+                    params.success(result);
+            },
+            error: function (request, status, reason_phrase) {
+                if (params.error)
+                    params.error(request, status, reason_phrase);
+            }
+        });
+  };
+
 
   /**
    *
@@ -349,6 +367,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
 
   module.get_model_arrayset_metadata = function(params)
   {
+    console.log("In get_model_arrayset_metadata and aid is: " + params.aid);
     var search = {};
     if(params.arrays)
       search.arrays = params.arrays;
@@ -409,6 +428,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       },
       error: function(request, status, reason_phrase)
       {
+        console.log(reason_phrase);
         if(params.error)
           params.error(request, status, reason_phrase);
       },
@@ -496,7 +516,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
   {
     console.log("slycat-web-client.get_model_table_metadata() is deprecated, use get_model_arrayset_metadata() instead.");
 
-    var url = server_root + "models/" + params.mid + "/tables/" + params.aid + "/arrays/" + (params.array || "0") + "/metadata";
+    var url = server_root + "models/" + params.mid + "/tables/" + params.aid[0] + "/arrays/" + (params.array || "0") + "/metadata";
     if(params.index)
       url += "?index=" + params.index;
 
@@ -1044,7 +1064,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         "mid": params.mid,
         "input": params.input,
         "parser": params.parser,
-        "aids": params.aids
+        "aids": params.aids,
       }),
       type: "POST",
       url: server_root + "uploads",

@@ -5,6 +5,10 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
     var component = {};
     component.tab = ko.observable(0);
     component.project = params.projects()[0];
+    component.server_files = ko.observableArray();
+    component.selected_file = ko.observable("");
+    component.current_aids = ko.observable("");
+    component.csv_data = ko.observableArray();
     component.cluster_linkage = ko.observable("average"); // average is selected by default...
     component.cluster_column = ko.observable(false);
     component.image_columns_names = ko.observableArray();
@@ -99,6 +103,39 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       });
     };
 
+    //Grab file names from the server.
+    //Right now this is working because it gets called way before it's needed, so the ajax request has time to process.
+    //This will need to be changed at some point.
+    component.get_server_files = function() {
+      client.get_project_csv_data({
+          pid: component.project._id(),
+          success: function(attachments) {
+            for(i = 0; i < attachments.length; i++) {
+                data = attachments[i];
+                component.csv_data.push(data);
+            }
+          },
+          error: dialog.ajax_error("There was an error retrieving the CSV data."),
+      });
+    };
+
+    component.get_server_file_names = function() {
+      client.get_project_file_names({
+          pid: component.project._id(),
+          success: function(attachments) {
+            for(i = 0; i < attachments.length; i++) {
+                file = attachments[i];
+                fileName = file["file_name"];
+                component.server_files.push(fileName);
+            }
+          },
+          error: dialog.ajax_error("There was an error retrieving the CSV data."),
+      });
+    };
+
+    component.get_server_files();
+    component.get_server_file_names();
+
     // Create a model as soon as the dialog loads. We rename, change description and marking later.
     component.create_model();
 
@@ -113,7 +150,11 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
 
       if (type === "local") {
         component.upload_table();
-      } else if (type === "remote") {
+      }
+      else if (type == "server") {
+          component.existing_table();
+      }
+      else if (type === "remote") {
         component.connect();
       }
     };
@@ -143,7 +184,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         success: function(media_columns) {
           client.get_model_table_metadata({
             mid: component.model._id(),
-            aid: "data-table",
+            aid: [["data-table"], component.current_aids],
             success: function(metadata) {
               uploader.progress(100);
               uploader.progress_status('Finished');
@@ -170,7 +211,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
               }
               // find the first image column and set its name to component.cluster_column
               // component.cluster_column
-
               mapping.fromJS(attributes, component.attributes);
               component.tab(2);
               $('.browser-continue').toggleClass("disabled", false);
@@ -180,15 +220,50 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       });
     };
 
+    component.existing_table = function() {
+        //var file = component.browser.selection()[0];
+        var fileName = component.selected_file;
+        component.current_aids = fileName();
+        console.log("component.current_aids is: " + component.current_aids);
+        //var file = new File([""], fileName())
+        var csvData = component.csv_data();
+        var blob = new Blob([ csvData ], {
+        type : "application/csv;charset=utf-8;"
+        });
+        file.lastModified = null; file.lastModifiedDate = null; file.name = component.current_aids; file.size = null; file.type = null; file.webkitRelativePath = null;
+        var fileObject = {
+            pid: component.project._id(),
+            mid: component.model._id(),
+            file: blob,
+            aids: [["data-table"], component.current_aids],
+            parser: component.parser(),
+            progress: component.browser.progress,
+            progress_status: component.browser.progress_status,
+            progress_final: 90,
+            success: function() {
+                upload_success(component.browser);
+            },
+            error: function() {
+                dialog.ajax_error("Did you choose the correct file and filetype? There was a problem parsing the file: ")();
+                $('.browser-continue').toggleClass("disabled", false);
+                component.browser.progress(null);
+                component.browser.progress_status('');
+            }
+        };
+        fileUploader.uploadFile(fileObject);
+    };
+
     component.upload_table = function() {
       //$('.local-browser-continue').toggleClass("disabled", true);
       //TODO: add logic to the file uploader to look for multiple files list to add
       var file = component.browser.selection()[0];
+      component.current_aids = file.name;
       var fileObject ={
        pid: component.project._id(),
        mid: component.model._id(),
        file: file,
-       aids: ["data-table"],
+       //aids: [["data-table"]],
+       aids: [["data-table"], component.current_aids],
        parser: component.parser(),
        progress: component.browser.progress,
        progress_status: component.browser.progress_status,
@@ -242,7 +317,8 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         success: function(media_columns) {
           client.get_model_table_metadata({
             mid: component.model._id(),
-            aid: "data-table",
+            //aids: [["data-table"]],
+            aids: [["data-table"], component.current_aids],
             success: function(metadata) {
               uploader.progress(100);
               uploader.progress_status('Finished');
@@ -369,12 +445,14 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
 
     component.load_table = function() {
       $('.remote-browser-continue-data').toggleClass("disabled", true);
+      console.log("The current_aids in load_table is: " + component.current_aids);
       var fileObject ={
        pid: component.project._id(),
        hostname: [component.remote.hostname()],
        mid: component.model._id(),
        paths: [component.remote.selection()],
-       aids: ["data-table"],
+       //aids: [["data-table"]],
+       aids: [["data-table"], component.current_aids],
        parser: component.parser(),
        progress: component.remote.progress,
        progress_status: component.remote.progress_status,
