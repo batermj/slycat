@@ -228,7 +228,6 @@ def create_session(mid, input, parser, aids, kwargs):
   uid : string
     A unique session identifier.
   """
-  cherrypy.log.error("******** HEY IN CREATE_SESSION AND AIDS IS: " + aids[1])
   database = slycat.web.server.database.couchdb.connect()
   model = database.get("model", mid)
   project = database.get("project", model["project"])
