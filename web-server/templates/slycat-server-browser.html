@@ -1,0 +1,21 @@
+<div class="form-group">
+  <!--<label for="slycat-server-browser-file" class="col-sm-2 control-label"-->
+  	<!--data-bind="css: {'disabled' : disabled}">-->
+  	<!--File-->
+  <!--</label>-->
+  <div class="col-sm-10">
+    <!--<input type="file" class="" id="slycat-server-browser-file" placeholder="file" data-bind="event:{change: selection_changed}, attr: {'disabled' : disabled, 'multiple' : multiple}">-->
+    <div class="progress" data-bind="visible: progress() != undefined && progress() > 0 && disabled() == false">
+      <div class="progress-bar progress-bar-striped active" role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        data-bind="
+          attr: {'aria-valuenow' : progress},
+          style: {'width' : progress() + '%'},
+          text: progress_status,
+      ">
+        Uploading
+      </div>
+    </div>
+  </div>
+</div>

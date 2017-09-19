@@ -95,6 +95,7 @@ def js_bundle():
                                                                                   "js/slycat-navbar.js",
                                                                                   "js/slycat-local-browser.js",
                                                                                   "js/slycat-remote-browser.js",
+                                                                                  "js/slycat-server-browser.js",
                                                                                   "js/slycat-remote-controls.js",
                                                                                   "js/slycat-remotes.js",
                                                                                   "js/slycat-login-controls.js",
