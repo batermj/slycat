@@ -14,13 +14,11 @@ define("slycat-local-browser", ["slycat-server-root", "slycat-web-client", "knoc
       component.type = ko.observable("");
       component.selection = params.selection;
       component.disabled = params.disabled === undefined ? false : params.disabled;
-      console.log("Disabled in local-browser is: " + params.disabled());
       component.multiple = params.multiple == true ? 'multiple' : null; // Set multiple parameter to true if you want multiple file selection enabled
       component.progress = params.progress != undefined ? params.progress : ko.observable(undefined);
       component.progress_status = params.progress_status != undefined ? params.progress_status : ko.observable('');
       component.selection_changed = function(model, event)
       {
-        console.log("Disabled in local is: " + component.disabled());
         component.selection(event.target.files);
       }
     },
