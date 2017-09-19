@@ -800,12 +800,6 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
     });
   };
 
-  //Parses existing data without re-uploading it
-  module.parse_existing_data = function(params)
-  {
-
-  }
-
   /**
    * put a reference in Slycat
    * @param params: object{
