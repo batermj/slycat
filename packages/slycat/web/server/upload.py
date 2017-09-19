@@ -153,7 +153,6 @@ class Session(object):
     if excess:
       cherrypy.response.status = "400 Client confused."
       return {"excess": excess}
-    cherrypy.log.error("***** HELLO FROM UPLOAD.PY *****" + self._aids[1])
     self._parsing_thread = threading.Thread(name="Upload parsing", target=Session._parse_uploads, args=[self])
     self._parsing_thread.start()
 
@@ -190,7 +189,6 @@ class Session(object):
         files.append(file)
 
       try:
-        cherrypy.log.error("********** HEY HERE IN _PARSE_UPLOADS JUST CHILLIN' *********" + self._aids[1])
         slycat.web.server.plugin.manager.parsers[self._parser]["parse"](database, model, self._input, files, self._aids[0], **self._kwargs)
         slycat.web.server.handlers.create_project_data(self._mid, self._aids, files)
       except Exception as e:
