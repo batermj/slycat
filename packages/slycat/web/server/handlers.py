@@ -912,7 +912,6 @@ def post_upload_finished(uid):
     :param uid: upload session ID
     :return: status of upload
     """
-    cherrypy.log.error("***** HELLO FROM HANDLERS.PY *****" + uid)
     uploaded = require_integer_array_json_parameter("uploaded")
     with slycat.web.server.upload.get_session(uid) as session:
         return session.post_upload_finished(uploaded)
