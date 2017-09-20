@@ -58,7 +58,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
                 component.csv_data.push(data);
             }
           },
-          error: dialog.ajax_error("There was an error retrieving the CSV data."),
       });
     };
 
@@ -72,7 +71,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
                 component.server_files.push(fileName);
             }
           },
-          error: dialog.ajax_error("There was an error retrieving the CSV data."),
       });
     };
 
@@ -192,12 +190,10 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
     };
 
     component.upload_table = function() {
-      console.log("upload_table is getting called.");
       $('.local-browser-continue').toggleClass("disabled", true);
       //TODO: add logic to the file uploader to look for multiple files list to add
       var file = component.browser.selection()[0];
       component.current_aids = file.name;
-      console.log("file object is: "); console.log(file);
       var fileObject ={
        pid: component.project._id(),
        mid: component.model._id(),
