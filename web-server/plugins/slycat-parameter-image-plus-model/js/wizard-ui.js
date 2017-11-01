@@ -103,41 +103,47 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       });
     };
 
+     component.get_server_file_names = function() {
+          client.get_project_file_names({
+              pid: component.project._id(),
+              success: function(attachments) {
+                for(i = 0; i < attachments.length; i++) {
+                    file = attachments[i];
+                    fileName = file["file_name"];
+                    component.server_files.push(fileName);
+                }
+              },
+              error: dialog.ajax_error("There was an error retrieving the CSV data."),
+          });
+        };
+
     //Grab file names from the server.
     //Right now this is working because it gets called way before it's needed, so the ajax request has time to process.
     //This will need to be changed at some point.
     component.get_server_files = function() {
       client.get_project_csv_data({
           pid: component.project._id(),
-          success: function(attachments) {
-            for(i = 0; i < attachments.length; i++) {
-                data = attachments[i];
+          file_key: component.selected_file(),
+          parser: "slycat-csv-parser",
+          mid: component.model._id(),
+          //aids: component.current_aids,
+          aids: 'data-table',
+
+          success: function(response) {
+                console.log("get_server_files was a success!");
+                data = JSON.stringify(response);
                 component.csv_data.push(data);
-            }
+                upload_success(component.browser);
           },
-          error: dialog.ajax_error("There was an error retrieving the CSV data."),
+          error: dialog.ajax_error("There was an error retrieving the CSV data. get_project_csv_data is failing."),
       });
     };
 
-    component.get_server_file_names = function() {
-      client.get_project_file_names({
-          pid: component.project._id(),
-          success: function(attachments) {
-            for(i = 0; i < attachments.length; i++) {
-                file = attachments[i];
-                fileName = file["file_name"];
-                component.server_files.push(fileName);
-            }
-          },
-          error: dialog.ajax_error("There was an error retrieving the CSV data."),
-      });
-    };
-
-    component.get_server_files();
-    component.get_server_file_names();
 
     // Create a model as soon as the dialog loads. We rename, change description and marking later.
     component.create_model();
+
+    component.get_server_file_names();
 
     component.cancel = function() {
       if(component.model._id())
@@ -175,17 +181,21 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
     };
 
     var upload_success = function(uploader) {
+      console.log("In upload_success");
       uploader.progress(95);
       uploader.progress_status('Finishing...');
+      console.log("mid is: "); console.log(component.model._id());
       client.get_model_command({
         mid: component.model._id(),
         type: "parameter-image-plus",
         command: "media-columns",
         success: function(media_columns) {
+          console.log("Before get_model_table_metadata");
           client.get_model_table_metadata({
             mid: component.model._id(),
             aid: [["data-table"], component.current_aids],
             success: function(metadata) {
+              console.log("Success in get_model_table_metadata!");
               uploader.progress(100);
               uploader.progress_status('Finished');
               var attributes = [];
@@ -220,11 +230,12 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       });
     };
 
+    //Most of this isn't needed anymore, so just add the stuff that's needed to get_server_files() and get rid of the rest.
+
     component.existing_table = function() {
-        //var file = component.browser.selection()[0];
         var fileName = component.selected_file;
         component.current_aids = fileName();
-        //var file = new File([""], fileName())
+        component.get_server_files();
         var csvData = component.csv_data();
         var blob = new Blob([ csvData ], {
         type : "application/csv;charset=utf-8;"
@@ -249,7 +260,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
                 component.browser.progress_status('');
             }
         };
-        fileUploader.uploadFile(fileObject);
     };
 
     component.upload_table = function() {

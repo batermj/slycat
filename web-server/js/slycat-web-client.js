@@ -156,7 +156,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
             dataType: "json",
             type: "GET",
             //url: server_root + "/projects/" + params.pid + "/project_data",
-            url: params.pid + "/data",
+            url: params.pid + "/data/" + params.file_key + "/parser/" + params.parser + "/mid/" + params.mid + "/aids/" + params.aids,
             success: function (result) {
                 if (params.success)
                     params.success(result);

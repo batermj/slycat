@@ -20,10 +20,10 @@ def parse_file(file):
         except ValueError:
             return False
 
-    cherrypy.log.error("parsing:::::::")
     rows = [row for row in
             csv.reader(file.splitlines(), delimiter=",", doublequote=True, escapechar=None, quotechar='"',
                        quoting=csv.QUOTE_MINIMAL, skipinitialspace=True)]
+
     if len(rows) < 2:
         slycat.email.send_error("slycat-csv-parser.py parse_file", "File must contain at least two rows.")
         raise Exception("File must contain at least two rows.")
@@ -59,7 +59,7 @@ def parse_file(file):
 
     return attributes, dimensions, data
 
-
+import cherrypy
 def parse(database, model, input, files, aids, **kwargs):
     """
     parses a file as a csv and then uploads the parsed data to associated storage for a
