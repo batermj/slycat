@@ -117,9 +117,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
           });
         };
 
-    //Grab file names from the server.
-    //Right now this is working because it gets called way before it's needed, so the ajax request has time to process.
-    //This will need to be changed at some point.
     component.get_server_files = function() {
       client.get_project_csv_data({
           pid: component.project._id(),
@@ -142,7 +139,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
 
     // Create a model as soon as the dialog loads. We rename, change description and marking later.
     component.create_model();
-
     component.get_server_file_names();
 
     component.cancel = function() {
@@ -181,21 +177,17 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
     };
 
     var upload_success = function(uploader) {
-      console.log("In upload_success");
       uploader.progress(95);
       uploader.progress_status('Finishing...');
-      console.log("mid is: "); console.log(component.model._id());
       client.get_model_command({
         mid: component.model._id(),
         type: "parameter-image-plus",
         command: "media-columns",
         success: function(media_columns) {
-          console.log("Before get_model_table_metadata");
           client.get_model_table_metadata({
             mid: component.model._id(),
             aid: [["data-table"], component.current_aids],
             success: function(metadata) {
-              console.log("Success in get_model_table_metadata!");
               uploader.progress(100);
               uploader.progress_status('Finished');
               var attributes = [];
@@ -229,8 +221,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         }
       });
     };
-
-    //Most of this isn't needed anymore, so just add the stuff that's needed to get_server_files() and get rid of the rest.
 
     component.existing_table = function() {
         var fileName = component.selected_file;
