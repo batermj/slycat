@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import agent
+import threading
 
 
 class Agent(agent.Agent):
@@ -34,25 +35,22 @@ class Agent(agent.Agent):
         return p.communicate()
 
     def launch(self, command):
+        output = self.run_remote_command(command["command"])
         results = {
             "ok": True,
-            "command": command["command"]
-        }
-
-        results["output"], results["errors"] = self.run_remote_command(command["command"])
-
+            "command": command["command"],
+            "output": output[0],
+            "errors": output[1]}
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
     def submit_batch(self, command):
+        output = self.run_remote_command(command["command"])
         results = {
             "ok": True,
             "filename": command["command"],
-            "output": -1
-        }
-
-        results["output"], results["errors"] = self.run_remote_command("qsub %s" % results["filename"])
-
+            "output": output[0],
+            "errors": output[1]}
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
@@ -61,21 +59,23 @@ class Agent(agent.Agent):
             "ok": True,
             "jid": command["command"]
         }
-
-        results["output"], results["errors"] = self.run_remote_command("qstat $PBS_JOBID")
-
+        try:
+            # /job_log.txt
+            results["output"], results["errors"] = ("COMPLETED", "COMPLETED")
+        except OSError as e:
+            sys.stdout.write("%s\n" % json.dumps({"ok": False, "message": e}))
+            sys.stdout.flush()
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
     def cancel_job(self, command):
+        output = self.run_remote_command("scancel %s" % command["command"]) # command is jid here
         results = {
             "ok": True,
-            "jid": command["command"]
+            "jid": command["command"],
+            "output": output[0],
+            "errors": output[1]
         }
-
-        results["output"], results["errors"] = self.run_remote_command(
-            "scancel %s" % results["jid"])  # TODO: this is wrong needs to be results["jid"]["jid"]
-
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
@@ -100,48 +100,29 @@ class Agent(agent.Agent):
                        time_seconds, fn,
                        tmp_file):
         f = tmp_file
-
-        f.write("#!/bin/csh\n\n")
-        f.write("#PBS -l walltime=%s:%s:%s\n" % (time_hours, time_minutes, time_seconds))
-        f.write("#PBS -l select=1:ncpus=32:vntype=gpu\n")
-        f.write("#PBS -l place=scatter:excl\n")
-        f.write("#PBS -N slycat\n")
-        f.write("#PBS -q %s\n" % partition)
-        f.write("#PBS -r n\n")
-        f.write("#PBS -A %s\n" % wckey)
-        f.write("#PBS -V\n")
-        f.write("#PBS -j oe\n")
-
-        f.write("set slyDir=slycat_tmp\n")
-        f.write("cd $WORKDIR\n")
-
-        f.write("if (! -d $WORKDIR/$slyDir) then\n")
-        f.write("    mkdir $slyDir\n")
-        f.write("endif\n")
-        f.write("cd $slyDir\n")
-
-        f.write("set exechost=`hostname -s`\n")
-        f.write("echo \"++Slycat timeseries job running at `date` on $exechost, in directory `pwd` \"\n")
-        f.write("unlimit\n")
-        f.write("module load slycat\n")
-
-        f.write("echo \"++ Slycat job: launching ipcontroller at `date`\"\n")
-        f.write("ipcontroller --ip='*' &\n")
-        f.write("sleep 20\n")
-        f.write("echo \"++ Slycat job: launching ipython engines at `date`\"\n")
-        f.write("ipengine --location=$exechost &\n")
-        f.write("sleep 1\n")
-        f.write("ipengine --location=$exechost &\n")
-        f.write("sleep 1\n")
-        f.write("ipengine --location=$exechost &\n")
-        f.write("sleep 1\n")
-        f.write("ipengine --location=$exechost &\n")
-        f.write("sleep 20\n")
-        f.write("echo \"++ Slycat job: launching hdf5 conversion at `date`\"\n")
-
+        f.write("#!/bin/bash\n\n")
+        f.write("export SLYCAT_HOME=\/home\/slycat\/src\/slycat\n")
+        f.write("#SBATCH --account=%s\n" % wckey)
+        f.write("#SBATCH --job-name=slycat-tmp\n")
+        f.write("#SBATCH --partition=%s\n\n" % partition)
+        f.write("#SBATCH --nodes=%s\n" % nnodes)
+        f.write("#SBATCH --ntasks-per-node=%s\n" % ntasks_per_node)
+        f.write("#SBATCH --time=%s:%s:%s\n" % (time_hours, time_minutes, time_seconds))
+        f.write("echo \"RUNNING\" > job_log.txt\n")
+        # f.write("ipython profile create\n")
+        # f.write("echo \"Creating profile ${profile}\"\n")
+        # f.write("ipcontroller --ip='*' &\n")
+        # f.write("ipcluster start -n 4&\n")
+        f.write("echo \"Launching controller\"\n")
+        f.write("echo \"RUNNING\" > job_log.txt\n")
+        f.write("sleep 1m\n")
+        f.write("echo \"Launching job\"\n")
         for c in fn:
-            f.write("%s\n" % c)
-
+            f.write("%s >> outfile.txt\n" % c)
+        f.write("echo \"COMPLETE\" > job_log.txt\n")
+        # f.write("pkill -f ipcontroller \n")
+        # f.write("pkill -f ipcluster \n")
+        # f.write("pkill -f python \n")
         f.close()
 
     def run_function(self, command):
@@ -171,9 +152,22 @@ class Agent(agent.Agent):
                             tmp_file)
         with open(tmp_file.name, 'r') as myfile:
             data = myfile.read().replace('\n', '')
-        results["working_dir"] = working_dir
         results["temp_file"] = data
-        results["output"], results["errors"] = self.run_remote_command("qsub %s" % tmp_file.name)
+        self.run_remote_command("chmod 755 %s" % tmp_file.name)
+        # print "starting"
+        # print tmp_file.name
+        try:
+            # print (".%s &> /dev/null" % tmp_file.name)
+            # p = Process(target=self.run_remote_command, args=(("sh %s >> outfile.txt" % tmp_file.name),))
+            # p.start()
+            t = threading.Thread(target=self.run_remote_command, args=("sh %s &>/dev/null &; disown" % tmp_file.name,))
+            t.start()
+            results["working_dir"] = working_dir
+            results["errors"] = None
+            results["output"] = "1234567 aids"
+        except Exception:
+            raise
+        # print "running"
 
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()

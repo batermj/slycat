@@ -204,6 +204,7 @@ def get_projects(_=None):
     context["slycat-server-root"] = cherrypy.request.app.config["slycat-web-server"]["server-root"]
     context["slycat-css-bundle"] = css_bundle()
     context["slycat-js-bundle"] = js_bundle()
+    context["slycat-injected-code"] = cherrypy.request.app.config["slycat-web-server"].get("injected-code", "")
     return slycat.web.server.template.render("slycat-projects.html", context)
 
 
@@ -278,6 +279,7 @@ def get_project(pid):
         context["slycat-js-bundle"] = js_bundle()
         context["slycat-project"] = project
         context["slycat-project-name"] = project.get("name", "").replace("'", "\\'")
+        context["slycat-injected-code"] = cherrypy.request.app.config["slycat-web-server"].get("injected-code", "")
         return slycat.web.server.template.render("slycat-project.html", context)
 
 
@@ -602,6 +604,7 @@ def get_page(ptype):
     context["slycat-css-bundle"] = css_bundle()
     context["slycat-js-bundle"] = js_bundle()
     context["slycat-page-type"] = ptype
+    context["slycat-injected-code"] = cherrypy.request.app.config["slycat-web-server"].get("injected-code", "")
 
     if ptype not in slycat.web.server.plugin.manager.pages:
         context["slycat-page-html"] = u"""
@@ -647,6 +650,7 @@ def get_model(mid, **kwargs):
             "page-before"]
         context["slycat-marking-after-html"] = marking["badge"] if marking["page-after"] is None else marking[
             "page-after"]
+        context["slycat-injected-code"] = cherrypy.request.app.config["slycat-web-server"].get("injected-code", "")
 
         context["slycat-model"] = model
         context["slycat-model-name"] = model.get("name", "").replace("'", "\\'")
@@ -2182,8 +2186,10 @@ def job_time(nodes, tasks, size):
 @cherrypy.tools.json_in(on=True)
 @cherrypy.tools.json_out(on=True)
 def set_user_config(hostname):
+    # TODO add user config mapping
     sid = get_sid(hostname)
     config = cherrypy.request.json["config"]
+    cherrypy.log.error("user_config %s" % config)
     with slycat.web.server.remote.get_session(sid) as session:
         return session.set_user_config(config)
 
@@ -2288,16 +2294,17 @@ def get_time_series_names(hostname, path, **kwargs):
             column_types.append("string")
     rows = rows[1:]  # removes first row (header)
 
+    file_extensions = {".csv", ".dat", ".prn", "csv", "dat", "prn"}
     response_time_series_names = []
     for i, val in enumerate(rows[0]):
         if column_types[i] is "string":
-            file_ext = val[len(rows[1][i]) - 3:]
-            if file_ext == "csv" or file_ext == "dat" or file_ext == "prn":
+            file_ext = val[-3:]
+            if file_ext in file_extensions:
                 response_time_series_names.append(column_names[i])
     if len(response_time_series_names) >= 1:
         return response_time_series_names
     else:
-        raise cherrypy.HTTPError("400 Missing timeseries names.")
+        raise cherrypy.HTTPError("400 could not detect timeseries names. There could be hidden characters in your csv")
 
 
 @cherrypy.tools.json_out(on=True)

@@ -63,10 +63,11 @@ class Agent(agent.Agent):
         }
         try:
             results["output"], results["errors"] = self.run_remote_command("sacct -j %s --format=jobname,state" % results["jid"])
-            myset = [line.split() for line in results["output"]]
+            myset = results["output"].split('\n')
+            results["output"]="COMPLETED"
             for _ in myset:
                 if "slycat-tmp" in _:
-                    results["output"] = _[1]
+                    results["output"] = _.split()[1]
                     break
         except OSError as e:
             sys.stdout.write("%s\n" % json.dumps({"ok": False, "message": e}))
@@ -149,14 +150,19 @@ class Agent(agent.Agent):
         time_minutes = command["command"]["time_minutes"]
         time_seconds = command["command"]["time_seconds"]
         fn = command["command"]["fn"]
+        working_dir = command["command"]["working_dir"]
         # uid = command["command"]["uid"]
-
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, dir=os.getcwd())
+        try:
+            self.run_remote_command("mkdir -p %s" % working_dir)
+        except Exception:
+            pass
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, dir=working_dir)
         self.generate_batch(module_name, wckey, nnodes, partition, ntasks_per_node, time_hours, time_minutes,
                             time_seconds, fn,
                             tmp_file)
         with open(tmp_file.name, 'r') as myfile:
             data = myfile.read().replace('\n', '')
+        results["working_dir"] = working_dir
         results["temp_file"] = data
         results["output"], results["errors"] = self.run_remote_command("sbatch %s" % tmp_file.name)
 

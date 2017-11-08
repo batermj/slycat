@@ -65,6 +65,7 @@ var bodyLayout = $("#timeseries-model").layout({
   north :
   {
     size: 28,
+    resizable: false,
     resizeWhileDragging : false,
   },
   west :
@@ -119,7 +120,7 @@ function doPoll() {
         // If the model isn't ready or failed, we're done.
       if(model["state"] == "waiting" || model["state"] == "running") {
         show_checkjob();
-        setTimeout(doPoll, 5000);
+        setTimeout(doPoll, 15000);
         return;
       }
 

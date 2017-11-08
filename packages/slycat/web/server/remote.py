@@ -211,19 +211,9 @@ class Session(object):
                 raise cherrypy.HTTPError(400)
 
             # parses the useful information from job status
-            out = response["output"]
-            js = "UNKNOWN"
-
-            for line in out.splitlines():
-                if "State" in line:
-                    try:
-                        js = line.split(':')[1].strip().upper()
-                    except Exception as e:
-                        js = "UNKNOWN"
-                    break
-
+            cherrypy.log.error("response state:%s" % response["output"])
             status = {
-                "state": js
+                "state": response["output"]
             }
 
             return {"jid": response["jid"], "status": status, "errors": response["errors"]}
@@ -447,10 +437,9 @@ class Session(object):
 
             return arr
 
-        def compute_timeseries(fn_id, params):
+        def compute_timeseries(fn_id, params, working_dir):
             arr = list(ipython_parallel_setup_arr)
 
-            working_dir = params["workdir"] + "/slycat/"
             hdf5_dir = working_dir + "hdf5/"
             pickle_dir = working_dir + "pickle/"
 
@@ -499,16 +488,22 @@ class Session(object):
 
             return arr
 
-        def agent_functions(fn_id, params):
+        def agent_functions(fn_id, params, working_dir=None):
             # agent_function is a placeholder for the future:
             # it will contain the logic for different type of agent functions
             # depending on the function identifier.
             if fn_id == "timeseries-model":
-                return compute_timeseries(fn_id, params)
+                return compute_timeseries(fn_id, params, working_dir)
             else:
                 return create_distance_matrix(fn_id, params)
 
         stdin, stdout, stderr = self._agent
+        hash_dir_name = uuid.uuid4().hex
+        # everything up to the hashed working directory
+        if fn_params["workdir"][-1] == '/':
+            work_dir = fn_params["workdir"] + "slycat/" + hash_dir_name + "/"
+        else:
+            work_dir = fn_params["workdir"] + "/slycat/" + hash_dir_name + "/"
         payload = {
             "action": "run-function",
             "command": {
@@ -520,8 +515,9 @@ class Session(object):
                 "time_hours": time_hours,
                 "time_minutes": time_minutes,
                 "time_seconds": time_seconds,
-                "fn": agent_functions(fn, fn_params),
-                "uid": uid
+                "fn": agent_functions(fn, fn_params, working_dir=work_dir),
+                "uid": uid,
+                "working_dir": work_dir
             }
         }
         cherrypy.log.error("writing msg: %s" % json.dumps(payload))
@@ -544,7 +540,7 @@ class Session(object):
         else:
             jid = -1
 
-        return {"jid": jid, "errors": response["errors"]}
+        return {"jid": jid, "working_dir": response["working_dir"], "errors": response["errors"]}
 
     def launch(self, command):
         """

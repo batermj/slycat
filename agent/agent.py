@@ -131,7 +131,7 @@ class Agent(object):
 
     def get_user_config(self):
         """
-        writes the users config as json 
+        reads the users config as json 
         {results:{config:{}, "ok":bool, errors:"string errors message"}}
         :return: 
         """
@@ -159,26 +159,34 @@ class Agent(object):
         sys.stdout.flush()
 
     def set_user_config(self, command):
+        """
+        writes config into ~/.slycatrc file of the user
+        :param command: incoming json format should be 
+        {
+        action:"action",
+        command:{config:{section_key:{option_key:"value"}...}}
+        }
+        :return: 
+        """
         results = {
             "ok": True,
             "errors": ""
         }
         config = command["command"]["config"]
-
         rc = os.path.expanduser('~') + "/.slycatrc"
-        rc_file = open(rc, "w+")
-        parser = ConfigParser.RawConfigParser()
 
-        for section_key in config:
-            if not parser.has_section(section_key):
-                parser.add_section(section_key)
-            section = config[section_key]
-            for option_key in section:
-                if not str(section[option_key]) == "":
-                    parser.set(section_key, option_key, "\"%s\"" % section[option_key])
-
-        parser.write(rc_file)
-        rc_file.close()
+        with open(rc, "w+") as rc_file:
+            rc_file.seek(0)
+            rc_file.truncate()
+            parser = ConfigParser.RawConfigParser()
+            for section_key in config:
+                if not parser.has_section(section_key):
+                    parser.add_section(section_key)
+                section = config[section_key]
+                for option_key in section:
+                    if not str(section[option_key]) == "":
+                        parser.set(section_key, option_key, "\"%s\"" % section[option_key])
+            parser.write(rc_file)
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
@@ -339,6 +347,10 @@ class Agent(object):
         sys.stdout.flush()
 
     def run(self):
+        """
+        format {action:action, command: command}
+        :return: 
+        """
         self.log.info("\n")
         self.log.info("*agent started*")
         # Parse and sanity-check command-line arguments.
