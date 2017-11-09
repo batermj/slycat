@@ -88,6 +88,7 @@ def register_slycat_plugin(context):
       end  = time.time()
       model["analysis_computation_time"] = (end - start)
       database.save(model)
+      cherrypy.log.error("Finished computing.")
     except:
       cherrypy.log.error("%s" % traceback.format_exc())
 
