@@ -378,7 +378,6 @@ def get_project_csv_data(pid, file_key, parser, mid, aids):
                         new_model = False
 
     if new_model:
-        cherrypy.log.error("Made it into the model_id check.")
         fid = item["_id"]
         file_name = item["file_name"]
         model_ids = item["mid"]
@@ -387,8 +386,6 @@ def get_project_csv_data(pid, file_key, parser, mid, aids):
         created = item["created"]
         creator = item["creator"]
         revision = item["_rev"]
-        cherrypy.log.error("Revision is: ")
-        cherrypy.log.error(str(revision))
 
         update_project_data(model_ids, fid, file_name, project_id, created, creator, revision, attachment[0])
 
@@ -497,7 +494,6 @@ def create_project_data(mid, aid, file):
     :param pid: project ID for created model
     :return: json {"id" : mid}
     """
-    cherrypy.log.error("adding project data")
     content_type = "text/csv"
     database = slycat.web.server.database.couchdb.connect()
     model = database.get("model", mid)
@@ -524,7 +520,6 @@ def create_project_data(mid, aid, file):
     cherrypy.log.error("added project data")
 
 def update_project_data(model_ids, fid, file_name, project_id, created, creator, revision, file):
-    cherrypy.log.error("Made it into update_project_data")
     database = slycat.web.server.database.couchdb.connect()
     content_type = "text/csv"
 
@@ -540,8 +535,6 @@ def update_project_data(model_ids, fid, file_name, project_id, created, creator,
         "creator": creator,
     }
     database.save(data)
-    cherrypy.log.error("Saved new project data")
-    cherrypy.log.error("Saved new project data")
     database.put_attachment(data, filename="content", content_type=content_type, content=file)
     cherrypy.log.error("updated project data")
 
