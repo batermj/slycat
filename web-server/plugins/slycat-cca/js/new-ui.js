@@ -67,6 +67,9 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
     //Right now this is working because it gets called way before it's needed, so the ajax request has time to process.
     //This will need to be changed at some point.
     component.get_server_files = function() {
+      component.browser.progress(10);
+      component.browser.progress_status("Parsing...");
+
       client.get_project_csv_data({
           pid: component.project._id(),
           file_key: component.selected_file(),
@@ -76,7 +79,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
           aids: 'data-table',
 
           success: function(response) {
-                console.log("get_server_files was a success!");
                 data = JSON.stringify(response);
                 component.csv_data.push(data);
                 upload_success(component.browser);
@@ -180,31 +182,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       var fileName = component.selected_file;
       component.current_aids = fileName();
       component.get_server_files();
-      var csvData = component.csv_data();
-      var blob = new Blob([ csvData ], {
-      type : "application/csv;charset=utf-8;"
-      });
-      file.lastModified = null; file.lastModifiedDate = null; file.name = component.current_aids; file.size = null; file.type = null; file.webkitRelativePath = null;
-      var fileObject = {
-          pid: component.project._id(),
-          mid: component.model._id(),
-          file: blob,
-          aids: [["data-table"], component.current_aids, true], //If existing data, last value is true.
-          parser: component.parser(),
-          progress: component.browser.progress,
-          progress_status: component.browser.progress_status,
-          progress_final: 90,
-          success: function() {
-              upload_success(component.browser);
-          },
-          error: function() {
-              dialog.ajax_error("Did you choose the correct file and filetype? There was a problem parsing the file: ")();
-              $('.browser-continue').toggleClass("disabled", false);
-              component.browser.progress(null);
-              component.browser.progress_status('');
-          }
-        };
-      };
+    };
 
     component.upload_table = function() {
       $('.local-browser-continue').toggleClass("disabled", true);
@@ -215,7 +193,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
        pid: component.project._id(),
        mid: component.model._id(),
        file: file,
-       aids: [["data-table"], component.current_aids, false],
+       aids: [["data-table"], component.current_aids],
        parser: component.parser(),
        progress: component.browser.progress,
        progress_status: component.browser.progress_status,

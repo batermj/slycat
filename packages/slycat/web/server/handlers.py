@@ -31,7 +31,6 @@ import slycat.web.server.resource
 import slycat.web.server.streaming
 import slycat.web.server.template
 import slycat.web.server.upload
-# import slycat.web.server.parse_existing_file
 import stat
 import subprocess
 import sys
@@ -363,22 +362,35 @@ def get_project_csv_data(pid, file_key, parser, mid, aids):
     project = database.get("project", pid)
     slycat.web.server.authentication.require_project_reader(project)
     project_datas = [data for data in database.scan("slycat/project_datas")]
-    data = []
-    attachment = []
+    attachment = [] #This needs to be an array because the parser is expecting it
+    new_model = True
 
     if not project_datas:
         cherrypy.log.error("The project_datas list is empty.")
     else:
         for item in project_datas:
             if item["project"] == pid and item["file_name"] == file_key:
-                # data_id = item["_id"]
                 http_response = database.get_attachment(item, "content")
                 file = http_response.read()
                 attachment.append(file)
-                #temp_json_data = {"file_name": item["file_name"]}
-                #data.append(temp_json_data)
+                for model_id in item["mid"]:
+                    if model_id == mid:
+                        new_model = False
 
-    #json_data = json.dumps(data)
+    if new_model:
+        cherrypy.log.error("Made it into the model_id check.")
+        fid = item["_id"]
+        file_name = item["file_name"]
+        model_ids = item["mid"]
+        model_ids.append(mid)
+        project_id = item["project"]
+        created = item["created"]
+        creator = item["creator"]
+        revision = item["_rev"]
+        cherrypy.log.error("Revision is: ")
+        cherrypy.log.error(str(revision))
+
+        update_project_data(model_ids, fid, file_name, project_id, created, creator, revision, attachment[0])
 
     attachment[0] = attachment[0].replace('\\n', '\n')
     attachment[0] = attachment[0].replace('["', '')
@@ -511,6 +523,27 @@ def create_project_data(mid, aid, file):
     database.put_attachment(data, filename="content", content_type=content_type, content=file)
     cherrypy.log.error("added project data")
 
+def update_project_data(model_ids, fid, file_name, project_id, created, creator, revision, file):
+    cherrypy.log.error("Made it into update_project_data")
+    database = slycat.web.server.database.couchdb.connect()
+    content_type = "text/csv"
+
+    data = {
+        "_id": fid,
+        "_rev": revision,
+        "type": "project_data",
+        "file_name": file_name,
+        "mid": model_ids,
+        "project": project_id,
+        "data_table": ["data_table"],
+        "created": created,
+        "creator": creator,
+    }
+    database.save(data)
+    cherrypy.log.error("Saved new project data")
+    cherrypy.log.error("Saved new project data")
+    database.put_attachment(data, filename="content", content_type=content_type, content=file)
+    cherrypy.log.error("updated project data")
 
 @cherrypy.tools.json_in(on=True)
 @cherrypy.tools.json_out(on=True)
