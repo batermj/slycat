@@ -149,12 +149,12 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
 
 
   //server_root isn't working for some reason.
-  module.get_project_csv_data = function(params)
+  module.put_project_csv_data = function(params)
   {
     $.ajax(
         {
             dataType: "json",
-            type: "GET",
+            type: "PUT",
             //url: server_root + "/projects/" + params.pid + "/project_data",
             url: params.pid + "/data/" + params.file_key + "/parser/" + params.parser + "/mid/" + params.mid + "/aids/" + params.aids,
             success: function (result) {
@@ -756,7 +756,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
         "marking": params.marking || "",
       }),
       type: "POST",
-      url: server_root + "projects/" + params.pid + "/models",
+      url: server_root + "projects/" + params.pid + "/file/" + params.file_name + "/models",
       success: function(result)
       {
         if(params.success)
@@ -764,6 +764,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       },
       error: function(request, status, reason_phrase)
       {
+        console.log(params.file_name);
         if(params.error)
           params.error(request, status, reason_phrase);
       }
@@ -1265,6 +1266,8 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       model.marking = params.marking;
     if("state" in params)
       model.state = params.state;
+    if("file_name" in params)
+      model.file_name = params.file_name;
 
     $.ajax(
     {
@@ -1280,6 +1283,7 @@ define("slycat-web-client", ["slycat-server-root", "jquery", "URI"], function(se
       },
       error: function(request, status, reason_phrase)
       {
+        console.log("Error out.");
         if(params.error)
           params.error(request, status, reason_phrase);
       }

@@ -55,6 +55,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         name: component.model.name(),
         description: component.model.description(),
         marking: component.model.marking(),
+        file_name: "temp",
         success: function(mid) {
           component.model._id(mid);
           //component.tab(1);
@@ -63,14 +64,11 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       });
     };
 
-    //Grab file names from the server.
-    //Right now this is working because it gets called way before it's needed, so the ajax request has time to process.
-    //This will need to be changed at some point.
     component.get_server_files = function() {
       component.browser.progress(10);
       component.browser.progress_status("Parsing...");
 
-      client.get_project_csv_data({
+      client.put_project_csv_data({
           pid: component.project._id(),
           file_key: component.selected_file(),
           parser: "slycat-csv-parser",
@@ -83,7 +81,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
                 component.csv_data.push(data);
                 upload_success(component.browser);
           },
-          error: dialog.ajax_error("There was an error retrieving the CSV data. get_project_csv_data is failing."),
+          error: dialog.ajax_error("There was an error retrieving the CSV data."),
       });
     };
 
@@ -134,7 +132,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         arrays: "0",
         statistics: "0/...",
         success: function(metadata) {
-          console.log("Success!");
           uploader.progress(100);
           uploader.progress_status('Finished');
           component.row_count(metadata.arrays[0].shape[0]); // Set number of rows
@@ -189,6 +186,34 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       //TODO: add logic to the file uploader to look for multiple files list to add
       var file = component.browser.selection()[0];
       component.current_aids = file.name;
+      var current_date = new Date();
+      var day = current_date.getDate();
+      var month = current_date.getMonth()+1;
+      var year = current_date.getFullYear();
+      var seconds = current_date.getSeconds();
+      var minute = current_date.getMinutes();
+      var hour = current_date.getHours();
+      var timestamp = day + '-' + month + '-' + year + ':' + hour + ':' + minute + ':' + seconds;
+
+      component.current_aids = file.name + timestamp;
+      console.log(component.current_aids);
+
+      client.put_model(
+      {
+        file_name: component.current_aids,
+        mid: component.model._id(),
+        success: function()
+        {
+          client.post_model_finish({
+            mid: component.model._id(),
+            success: function() {
+              console.log("Successfully added file name to the model.");
+            }
+          });
+        },
+        error: dialog.ajax_error("Error updating model."),
+      });
+
       var fileObject ={
        pid: component.project._id(),
        mid: component.model._id(),
