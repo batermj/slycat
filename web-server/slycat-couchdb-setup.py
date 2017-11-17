@@ -221,7 +221,7 @@ design = {
           if(doc["type"] != "project_data")
             return;
 
-          emit(doc._id, null);
+          emit(doc["project"], null);
         }
         """,
       },
