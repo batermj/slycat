@@ -95,6 +95,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         name: component.model.name(),
         description: component.model.description(),
         marking: component.model.marking(),
+        file_name: "temp",
         success: function(mid) {
           component.model._id(mid);
           component.remote.focus(true);
