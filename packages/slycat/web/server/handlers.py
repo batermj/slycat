@@ -332,16 +332,12 @@ def delete_project(pid):
     slycat.web.server.authentication.require_project_administrator(project)
 
     for cache_object in couchdb.scan("slycat/project-cache-objects", startkey=pid, endkey=pid):
-        cherrypy.log.error("Found cache_object")
         couchdb.delete(cache_object)
     for reference in couchdb.scan("slycat/project-references", startkey=pid, endkey=pid):
-        cherrypy.log.error("Found reference")
         couchdb.delete(reference)
     for bookmark in couchdb.scan("slycat/project-bookmarks", startkey=pid, endkey=pid):
-        cherrypy.log.error("Found bookmark")
         couchdb.delete(bookmark)
     for model in couchdb.scan("slycat/project-models", startkey=pid, endkey=pid):
-        cherrypy.log.error("Found model")
         couchdb.delete(model)
     for project_data in couchdb.scan("slycat/project_datas", startkey=pid, endkey=pid):
         couchdb.delete(project_data)
