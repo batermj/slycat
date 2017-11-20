@@ -131,12 +131,11 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
           aids: 'data-table',
 
           success: function(response) {
-                console.log("get_server_files was a success!");
                 data = JSON.stringify(response);
                 component.csv_data.push(data);
                 upload_success(component.browser);
           },
-          error: dialog.ajax_error("There was an error retrieving the CSV data. get_project_csv_data is failing."),
+          error: dialog.ajax_error("There was an error retrieving the CSV data."),
       });
     };
 
