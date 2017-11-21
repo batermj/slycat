@@ -404,7 +404,7 @@ def get_project_file_names(pid):
     data = []
 
     if not project_datas:
-        cherrypy.log.error("The project_datas list is empty.")
+        cherrypy.log.error("[MICROSERVICE] The project_datas list is empty.")
     else:
         for item in project_datas:
             if item["project"] == pid:
@@ -697,16 +697,13 @@ def get_model(mid, **kwargs):
 
 
 def model_command(mid, type, command, **kwargs):
-    cherrypy.log.error("In model_command.")
     database = slycat.web.server.database.couchdb.connect()
     model = database.get("model", mid)
     project = database.get("project", model["project"])
     slycat.web.server.authentication.require_project_reader(project)
-    cherrypy.log.error("Everything looks good so far...")
 
     key = (cherrypy.request.method, type, command)
     if key in slycat.web.server.plugin.manager.model_commands:
-        cherrypy.log.error("About to return something.")
         return slycat.web.server.plugin.manager.model_commands[key](database, model, cherrypy.request.method, type,
                                                                     command, **kwargs)
 
