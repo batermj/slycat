@@ -382,11 +382,11 @@ def put_project_csv_data(pid, file_key, parser, mid, aids):
     if fid is None:
         raise cherrypy.HTTPError("404 There was no file with name %s found." % file_key)
     try:
-        project_data = database.get("project_datas", fid)
+        project_data = database.get("project_data", fid)
         project_data["mid"].append(mid)
         database.save(project_data)
     except Exception as e:
-        cherrypy.log.error(e.message)
+        cherrypy.log.error(e)
 
     attachment[0] = attachment[0].replace('\\n', '\n')
     attachment[0] = attachment[0].replace('["', '')
