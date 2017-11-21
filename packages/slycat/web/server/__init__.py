@@ -173,8 +173,6 @@ def get_model_arrayset_metadata(database, model, aid, arrays=None, statistics=No
                 return results
 
     with slycat.web.server.hdf5.lock:
-        cherrypy.log.error("Line 206 in __init__.py and aid is: ")
-        cherrypy.log.error(str(aid))
         with slycat.web.server.hdf5.open(model["artifact:%s" % aid],
                                          "r+") as file:  # We have to open the file with writing enabled in case the statistics cache needs to be updated.
             hdf5_arrayset = slycat.hdf5.ArraySet(file)
