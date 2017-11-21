@@ -187,7 +187,6 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
       var timestamp = day + '-' + month + '-' + year + ':' + hour + ':' + minute + ':' + seconds;
 
       component.current_aids = file.name + timestamp;
-      console.log(component.current_aids);
 
       client.put_model(
       {
