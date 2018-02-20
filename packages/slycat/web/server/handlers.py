@@ -79,6 +79,7 @@ def js_bundle():
                                                                                   "js/knockout.mapping.js",
                                                                                   "js/knockout-projections.js",
                                                                                   "js/knockstrap.js",
+                                                                                  "js/papaparse.min.js",
                                                                                   "js/slycat-server-root.js",
                                                                                   "js/slycat-server-ispasswordrequired.js",
                                                                                   "js/slycat-bookmark-manager.js",
@@ -2038,6 +2039,7 @@ def post_remotes():
     username = cherrypy.request.json["username"]
     hostname = cherrypy.request.json["hostname"]
     password = cherrypy.request.json["password"]
+    msg = ""
     agent = cherrypy.request.json.get("agent", None)
     sid = slycat.web.server.remote.create_session(hostname, username, password, agent)
     '''
@@ -2059,7 +2061,8 @@ def post_remotes():
         database.save(session)
     except Exception as e:
         cherrypy.log.error("login could not save session for remotes %s" % e)
-    return {"sid": sid, "status": True, "msg": ""}
+        msg = "login could not save session for remote host"
+    return {"sid": sid, "status": True, "msg": msg}
 
 
 @cherrypy.tools.json_out(on=True)
@@ -2214,6 +2217,43 @@ def run_agent_function(hostname):
     with slycat.web.server.remote.get_session(sid) as session:
         return session.run_agent_function(wckey, nnodes, partition, ntasks_per_node, time_hours, time_minutes,
                                           time_seconds, fn, fn_params, uid)
+
+
+@cherrypy.tools.json_in(on=True)
+@cherrypy.tools.json_out(on=True)
+def post_remote_command(hostname):
+    """
+    run a remote command from the list of pre-registered commands
+    that are located on a remote agent.
+    :param hostname: name of the hpc host
+    :return: {
+        "message": a message that is supplied by the agent,
+        "command": an echo of the command 
+        that was sent to the server and the agent,
+        "error": boolean describing if there was an agent error,
+        "available_scripts": [{                    
+            "name": script_name,
+            "description": script_description,
+            "parameters": [{
+                "name": parameter_name as string,
+                "description": description of the param string,
+                "example":example usage string,
+                "type": field type eg string, int...
+            }]
+        }]list of available scripts from the agent
+    }
+    """
+    sid = get_sid(hostname)
+    command = cherrypy.request.json["command"]
+    with slycat.web.server.remote.get_session(sid) as session:
+        return session.run_remote_command(command)
+
+
+@cherrypy.tools.json_out(on=True)
+def get_remote_job_status(hostname, jid):
+    sid = get_sid(hostname)
+    with slycat.web.server.remote.get_session(sid) as session:
+        return session.get_remote_job_status(jid)
 
 
 @cherrypy.tools.json_in(on=True)

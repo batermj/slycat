@@ -542,6 +542,110 @@ class Session(object):
 
         return {"jid": jid, "working_dir": response["working_dir"], "errors": response["errors"]}
 
+    def run_remote_command(self, command):
+        """
+        run a remote command from an HPC source running a slycat
+        agent. the command could be things such as starting an hpc
+        script or batch job or something as simple as moving files.
+        the only requirement is that the script is in our list of 
+        trusted scripts.
+        
+        this_func()->calls agent_command_func()->which runs_shell_command()
+        -> which launches_script()-> sends_response_to_agent()->sends_response_to_server()
+        ->sends_status_response_to_client()
+        
+        :param self: 
+        :param command: json form of a command to be run
+        {
+            "scripts": //pre defined scripts that are registerd with the server
+            [{
+                "script_name":"script_name", // key for the script lookup 
+                "parameters": [{key:value},...] // params that are fed to the script
+            },...]
+            "hpc": // these are the hpc commands that may be add for thing such as slurm
+            {
+                "is_hpc_job":bol, // determins if this should be run as an hpc job
+                "parameters":[{key:value},...] // things such as number of nodes
+            }
+        }
+        :return: {"msg":"message from the agent", "error": boolean}
+        """
+        # check for an agent if none available die
+        if self._agent is None:
+            cherrypy.response.headers["x-slycat-message"] = "No Slycat agent present on remote host."
+            slycat.email.send_error("slycat.web.server.remote.py run_agent_function",
+                                    "cherrypy.HTTPError 500 no Slycat agent present on remote host.")
+            raise cherrypy.HTTPError(404, "no Slycat agent present on remote host.")
+
+        # get the name of our slycat module on the hpc
+        command["module-name"] = None
+        if "module-name" in slycat.web.server.config["slycat-web-server"]:
+            command["module-name"] = slycat.web.server.config["slycat-web-server"]["module-name"]
+        stdin, stdout, stderr = self._agent
+        payload = {
+            "action": "run-remote-command",
+            "command": command
+        }
+        cherrypy.log.error("writing msg: %s" % json.dumps(payload))
+        stdin.write("%s\n" % json.dumps(payload))
+        stdin.flush()
+        response = json.loads(stdout.readline())
+        cherrypy.log.error("response msg: %s" % response)
+        if not response["ok"]:
+            cherrypy.response.headers["x-slycat-message"] = response["message"]
+            cherrypy.log.error("agent response was not OK msg: %s" % response["message"])
+            slycat.email.send_error("slycat.web.server.remote.py run_agent_function",
+                                    "cherrypy.HTTPError 400 %s" % response["message"])
+            raise cherrypy.HTTPError(status=400,
+                                     message="run_agent_function response was not ok: %s" % response["message"])
+
+        return {
+            "message": response["message"],
+            "error": not response["ok"],
+            "command": response["command"],
+            "available_scripts": response["available_scripts"],
+            "output": response["errors"],
+            "errors": response["output"],
+            "jid": response["jid"]
+        }
+
+    def get_remote_job_status(self, jid):
+        """
+        check of the status of a job running on an agent with a hostanemd session
+        :param jid: job id
+        :return: 
+        """
+        command = {"jid": jid}
+        # check for an agent if none available die
+        if self._agent is None:
+            cherrypy.response.headers["x-slycat-message"] = "No Slycat agent present on remote host."
+            slycat.email.send_error("slycat.web.server.remote.py run_agent_function",
+                                    "cherrypy.HTTPError 500 no Slycat agent present on remote host.")
+            raise cherrypy.HTTPError(404, "no Slycat agent present on remote host.")
+
+        # get the name of our slycat module on the hpc
+        command["module-name"] = None
+        if "module-name" in slycat.web.server.config["slycat-web-server"]:
+            command["module-name"] = slycat.web.server.config["slycat-web-server"]["module-name"]
+        stdin, stdout, stderr = self._agent
+        payload = {
+            "action": "check-agent-job",
+            "command": command
+        }
+        cherrypy.log.error("writing msg: %s" % json.dumps(payload))
+        stdin.write("%s\n" % json.dumps(payload))
+        stdin.flush()
+        response = json.loads(stdout.readline())
+        cherrypy.log.error("response msg: %s" % response)
+        if not response["ok"]:
+            cherrypy.response.headers["x-slycat-message"] = response["message"]
+            cherrypy.log.error("agent response was not OK msg: %s" % response["message"])
+            slycat.email.send_error("slycat.web.server.remote.py run_agent_function",
+                                    "cherrypy.HTTPError 400 %s" % response["message"])
+            raise cherrypy.HTTPError(status=400,
+                                     message="run_agent_function response was not ok: %s" % response["message"])
+        return response
+
     def launch(self, command):
         """
         Submits a single command to a remote location via the slycat-agent or SSH.

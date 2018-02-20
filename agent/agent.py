@@ -33,6 +33,7 @@ import uuid
 import abc
 import logging
 import ConfigParser
+import glob
 
 session_cache = {}
 
@@ -47,10 +48,29 @@ class Agent(object):
     log.setLevel(logging.INFO)
     log.addHandler(logging.FileHandler('slycat-agent.log'))
     log.handlers[0].setFormatter(logging.Formatter("[%(asctime)s] - [%(levelname)s] : %(message)s"))
+
+    def __init__(self):
+        self.scripts = []
+        self.hpc = {}
+        self.json_paths = []
+        self._status_list = ["[STARTED]", "[RUNNING]", "[FINISHED]", "[FAILED]", "[UNKNOWN]"]
+
     @abc.abstractmethod
     def run_remote_command(self, command):
         """
+        run a predefine script on hpc. could potentially be
+        an hpc batch job such as slurm or pbs.
+        :param command: json command
+        :return:
+        """
+        pass
+
+    @abc.abstractmethod
+    def run_shell_command(self, command, jid=0, log_to_file=False):
+        """
         command to be run on the remote machine
+        :param log_to_file: bool for logging
+        :param jid: job id
         :param command: json command
         :return: 
         """
@@ -78,6 +98,15 @@ class Agent(object):
     def checkjob(self, command):
         """
         check a job's status on a remote machine
+        :param command: json command
+        :return: 
+        """
+        pass
+
+    @abc.abstractmethod
+    def check_agent_job(self, command):
+        """
+        check an agents job status on a remote machine
         :param command: json command
         :return: 
         """
@@ -131,6 +160,48 @@ class Agent(object):
         :return: 
         """
         pass
+
+    # @abc.abstractmethod
+    def get_hpc_run_string(self, command):
+        """
+        takes a command json and creates a string that can be
+        run hpc jobs
+        :param command: json command
+        :return: 
+        """
+        pass
+
+    def get_script_run_string(self, command_script):
+        """
+        takes a command json and creates a string that can be
+        run
+        :param command_script: json representation of a command_script
+        :return: 
+        """
+        run_command = ''
+        for agent_script in self.scripts:
+            # we just found a match lets add it to the command that we are going to run
+            if command_script["name"] == agent_script["name"]:
+                run_command += str(agent_script["exec_path"])
+                run_command += " "
+                run_command += str(agent_script["path"])
+                for parameter in command_script["parameters"]:
+                    run_command += " "
+                    run_command += str(parameter["name"])
+                    run_command += " "
+                    run_command += str(parameter["value"])
+                return run_command
+
+    def create_job_logger(self, jid):
+        """
+        returns a logging function with the jid.log as the file name
+        :param jid: job id
+        :return: 
+        """
+        log = logging.getLogger()
+        log.setLevel(logging.INFO)
+        log.addHandler(logging.FileHandler(str(jid) + '.log'))
+        return lambda msg: log.log(logging.INFO, msg)
 
     def get_user_config(self):
         """
@@ -354,7 +425,7 @@ class Agent(object):
         format {action:action, command: command}
         :return: 
         """
-        debug = False
+        debug = True
         self.log.info("\n")
         self.log.info("*agent started*")
         # Parse and sanity-check command-line arguments.
@@ -363,11 +434,19 @@ class Agent(object):
                             help="Fail immediately on startup.  Obviously, this is for testing.")
         parser.add_argument("--fail-exit", default=False, action="store_true",
                             help="Fail during exit.  Obviously, this is for testing.")
+        parser.add_argument('--json', action='append', default=[], help='path to json files dirs')
         arguments = parser.parse_args()
 
         if arguments.fail_startup:
             exit(-1)
-
+        # look for json configuration for hpc system and load it
+        if len(arguments.json) > 0:
+            self.json_paths = arguments.json
+            for path in self.json_paths:
+                # load all .js files in the directory given
+                for _ in glob.glob(path + "/*.js"):
+                    with open(_) as in_file:
+                        self.scripts.append(json.load(in_file))
         # Let the caller know we're ready to handle commands.
         sys.stdout.write("%s\n" % json.dumps({"ok": True, "message": "Ready."}))
         sys.stdout.flush()
@@ -416,6 +495,8 @@ class Agent(object):
                     self.video_status(command)
                 elif action == "launch":
                     self.launch(command)
+                elif action == "check-agent-job":
+                    self.check_agent_job(command)
                 elif action == "submit-batch":
                     self.submit_batch(command)
                 elif action == "checkjob":
@@ -424,6 +505,8 @@ class Agent(object):
                     self.get_job_output(command)
                 elif action == "run-function":
                     self.run_function(command)
+                elif action == "run-remote-command":
+                    self.run_remote_command(command)
                 elif action == "cancel-job":
                     self.cancel_job(command)
                 elif action == "get-user-config":

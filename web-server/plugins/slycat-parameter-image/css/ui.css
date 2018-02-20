@@ -28,6 +28,7 @@ rights in this software.
   -ms-user-select: none;
   user-select: none;
   shape-rendering: crispEdges;
+  cursor: default;
 }
 
 .x-axis path,
@@ -398,7 +399,10 @@ rights in this software.
 }
 /* Making text unselectable inside of the scatterplot because dragging usually is supposed to do other things,
    like selecting points or moving pins. */
-#scatterplot {
+#scatterplot,
+.slycat-pim-filter .varName,
+.category-filter .varName
+{
   -moz-user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
@@ -721,6 +725,40 @@ rights in this software.
   position: absolute;
   left: 44px;
 }
+.slycat-pim-filter:hover .minMaxHighLow .low,
+.slycat-pim-filter:hover .minMaxHighLow .high,
+.slycat-pim-filter .minMaxHighLow .high_precision.editing
+{
+  z-index: 6;
+}
+.slycat-pim-filter .minMaxHighLow .low_precision
+{
+  position: absolute;
+  top: 0;
+}
+.slycat-pim-filter .minMaxHighLow .high_precision
+{
+  visibility: hidden;
+  padding-right: 5px;
+  background-color: white;
+  position: relative;
+}
+/* Hide low precision label when... */
+/* Hovering over filter */
+.slycat-pim-filter:hover .minMaxHighLow .low_precision,
+/* Editing high precision label */
+.slycat-pim-filter .minMaxHighLow .high_precision.editing ~ .low_precision
+{
+  visibility: hidden;
+}
+/* Show high precision label when... */
+/* Hovering over filter */
+.slycat-pim-filter:hover .minMaxHighLow .high_precision,
+/* Editing high precision label */
+.slycat-pim-filter .minMaxHighLow .high_precision.editing
+{
+  visibility: visible;
+}
 .slycat-pim-filter .minMaxHighLow .max
 {
   top: 3px;
@@ -730,7 +768,11 @@ rights in this software.
 .slycat-pim-filter .max .edited,
 .slycat-pim-filter .min .edited,
 .slycat-pim-filter .max .hover,
-.slycat-pim-filter .min .hover
+.slycat-pim-filter .min .hover,
+.slycat-pim-filter .high .editing,
+.slycat-pim-filter .low .editing,
+.slycat-pim-filter .high .hover,
+.slycat-pim-filter .low .hover
 {
   background-color: #F0AD4E;
   border: 1px solid #CCC;
@@ -771,6 +813,7 @@ rights in this software.
   top: 50%;
   font-size: 13px;
   font-weight: bold;
+  cursor: default;
 }
 
 .category-filter {
@@ -985,4 +1028,9 @@ a {
 .slick-cell.flashing {
   border-width: 0px !important;
   opacity: 0.5;
+}
+
+slycat-3d-viewer .header-bar {
+  height: 37px;
+  white-space: nowrap;
 }
