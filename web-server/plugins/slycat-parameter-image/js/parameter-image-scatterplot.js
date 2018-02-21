@@ -57,8 +57,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       canvas_selected_square_border_size : 2,
       pinned_width : 200,
       pinned_height : 200,
-      pinned_stl_width: 200,
-      pinned_stl_height: 200,
+      pinned_stl_width: 600,
+      pinned_stl_height: 600,
       hover_time : 250,
       image_cache : {},
       video_file_extensions : [
@@ -69,12 +69,10 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       "video-sync" : false,
       "video-sync-time" : 0,
       frameLength : 1/25,
-      highest_z_index: 0,
     },
 
   syncing_videos : [],
   pausing_videos : [],
-  playing_videos : [],
   current_frame : null,
 
   _create: function()
@@ -348,15 +346,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     var selection = self.options.selection;
     var hidden_simulations = self.options.hidden_simulations;
 
-    self.options.filtered_indices = _.difference(
-      self._cloneArrayBuffer(indices).filter((element, index, array) => self._validateValue(x[index]) && self._validateValue(y[index]) ), 
-      hidden_simulations
-    );
-
-    self.options.filtered_selection = _.difference(
-      selection.filter((element, index, array) => self._validateValue(x[element]) && self._validateValue(y[element]) ), 
-      hidden_simulations
-    );
+    self.options.filtered_indices = _.difference(self._cloneArrayBuffer(indices).filter((element, index, array) => self._validateValue(x[index]) && self._validateValue(y[index]) ), hidden_simulations);
+    self.options.filtered_selection = _.difference(selection.filter((element, index, array) => self._validateValue(x[index]) && self._validateValue(y[index]) ), hidden_simulations);
   },
 
   // Filters source values by removing hidden_simulations
@@ -1079,34 +1070,28 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     var height = Number(self.svg.attr("height"));
 
     self.options.open_images = [];
-    
-    $(".open-image")
-      // Sort .open-images by their z-index
-      .sort(function(a, b){
-        return parseInt(a.style['z-index'], 10) - parseInt(b.style['z-index'], 10);
-      })
-      .each(function(index, frame){
-        var frame = $(frame);
-        var open_element = {
-          index : Number(frame.attr("data-index")),
-          uri : frame.attr("data-uri"),
-          relx : Number(frame.attr("data-transx")) / width,
-          rely : Number(frame.attr("data-transy")) / height,
-          width : frame.outerWidth(),
-          height : frame.outerHeight(),
-          current_frame : frame.hasClass("selected"),
-        };
-        var video = frame.find('video')[0];
-        if(video != undefined)
-        {
-          var currentTime = video.currentTime;
-          open_element["currentTime"] = currentTime;
-          open_element["video"] = true;
-          open_element["playing"] = self._is_video_playing(video);
-        }
-        self.options.open_images.push(open_element);
-      })
-      ;
+    $(".open-image").each(function(index, frame)
+    {
+      var frame = $(frame);
+      var open_element = {
+        index : Number(frame.attr("data-index")),
+        uri : frame.attr("data-uri"),
+        relx : Number(frame.attr("data-transx")) / width,
+        rely : Number(frame.attr("data-transy")) / height,
+        width : frame.outerWidth(),
+        height : frame.outerHeight(),
+        current_frame : frame.hasClass("selected"),
+      };
+      var video = frame.find('video')[0];
+      if(video != undefined)
+      {
+        var currentTime = video.currentTime;
+        open_element["currentTime"] = currentTime;
+        open_element["video"] = true;
+        open_element["playing"] = self._is_video_playing(video);
+      }
+      self.options.open_images.push(open_element);
+    });
 
     self.element.trigger("open-images-changed", [self.options.open_images]);
   },
@@ -1215,9 +1200,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
         img.y = self._getDefaultYPosition(img.index, img.height);
       }
 
-      // Increment self.options.highest_z_index before assigning it
-      self.options.highest_z_index++;
-
       var frame_html = self.media_layer.append("div")
         .attr("data-uri", img.uri)
         .attr("data-transx", img.x)
@@ -1226,8 +1208,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           "left": img.x + "px",
           "top": img.y + "px",
           "width": img.width + "px",
-          "height": img.height + 20 + "px",
-          "z-index": self.options.highest_z_index,
+          "height": img.height + "px",
+          "z-index": 1,
         })
         .attr("class", img.image_class + " image-frame scaffolding html ")
         .classed("selected", img.current_frame)
@@ -1239,7 +1221,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
             .on("dragstart", handlers["move_start"])
             .on("dragend", handlers["move_end"])
         )
-        .on("mousedown", handlers["frame_mousedown"])
+        .on("click", handlers["frame_click"])
         ;
 
       var footer = frame_html.append("div")
@@ -1284,6 +1266,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     var handlers = {
       move: (function() {
         // console.log("move");
+        self._move_frame_to_front(this);
         var theElement, transx, transy;
         if (within_svg(d3.event, self.options)) {
           theElement = d3.select(this);
@@ -1298,6 +1281,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       }),
       move_start: (function() {
         // console.log("move_start");
+        // Do not call _move_frame_to_front here on drag_start because it's called on mousedown and that causes problems (see note on _move_frame_to_front function)
+        // self._move_frame_to_front(this);
         var frame, sourceEventTarget;
         self.state = "moving";
         sourceEventTarget = d3.select(d3.event.sourceEvent.target);
@@ -1312,6 +1297,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
             image.image_class = "open-image";
           }
         }
+        d3.event.sourceEvent.stopPropagation();
       }),
       move_end: function() {
         // console.log("move_end");
@@ -1324,10 +1310,10 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
         self._remove_image_and_leader_line(frame);
         self._sync_open_images();
       }),
-      frame_mousedown: function(){
-        // console.log("frame_mousedown");
+      frame_click: function(){
+        // console.log("frame_click");
         var target = d3.select(d3.event.target);
-        // Do nothing if close button was clicked because we don't want to shift focus to frame that's about to be closed
+        // Do nothing if close button was clicked
         if(target.classed("close-button"))
         {
           return;
@@ -1338,7 +1324,8 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
             .on('.drag', null)
             .call(nodrag);
         }
-        // Move the frame to the front.
+        // Move the frame to the front. Do not run this on mousedown or mouseup, because it stops propagation
+        // of click events (and possibly others) in Chrome and Safari.
         self._move_frame_to_front(this);
       },
       hover: (function() {
@@ -1349,6 +1336,7 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       }),
       resize: (function() {
         // console.log("resize");
+        self._move_frame_to_front(this.closest(".image-frame"));
         var frame, min, target_width, x, y;
         min = 50;
         x = d3.event.x;
@@ -1371,9 +1359,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       }),
       resize_start: (function() {
         // console.log("resize_start");
-        // Need to explicitly move the frame to the front on resize_start because we stopPropagation later in this 
-        // event handler and that stops the mousedown handler from moving the frame to the front automatically.
-        self._move_frame_to_front(this.closest(".image-frame"));
         var frame;
         self.state = "resizing";
         frame = d3.select(this.closest(".image-frame"));
@@ -1387,7 +1372,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           frame.classed("hover-image", false).classed("open-image", true);
           image.image_class = "open-image";
         }
-        // Need to stopPropagation here otherwise the system thinks we are moving the frame and does that instead of resize
         d3.event.sourceEvent.stopPropagation();
       }),
       resize_end: (function() {
@@ -1571,15 +1555,9 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
           .style({
             "display": "none",
           })
-          .on("mousedown", function(event){
-            // console.log("video onmousedown");
-          })
-          .on("click", function(event){
-            // console.log("video onclick");
-          })
           .on("loadedmetadata", function(){
             // debugger;
-            // console.log("onloadedmetadata");
+            // console.log("video loaded metadata");
             var width = this.videoWidth;
             var height = this.videoHeight;
             var ratio = width/height;
@@ -1606,11 +1584,9 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
             }
           })
           .on("playing", function(){
-            // console.log("onplaying");
             self._sync_open_images();
           })
           .on("pause", function(){
-            // console.log("onpause");
             var pausing_index = self.pausing_videos.indexOf(image.index);
             // If video was directly paused by user, set a new video-sync-time and sync all other videos
             if(pausing_index < 0)
@@ -1625,9 +1601,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
                 this.currentTime = self.options["video-sync-time"];
               }
               handlers["pause_video"]();
-              // Need to explicitly move the frame to the front when interacting with video controls because
-              // Chrome does not propagate any mouse events after controls are clicked.
-              self._move_frame_to_front(this.closest(".image-frame"));
             }
             // Do nothing if video was paused by system, just remove it from the paused videos list
             else
@@ -1635,50 +1608,25 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
               self.pausing_videos.splice(pausing_index, 1);
             }
           })
-          .on("seeked", function(event){
-            // console.log("onseeked");
+          .on("seeked", function(){
             var index = self.syncing_videos.indexOf(image.index);
             if(index < 0)
             {
               self.options["video-sync-time"] = this.currentTime;
               handlers["seeked_video"]();
               pinVideo(self, this, image);
-              // Need to explicitly move the frame to the front when interacting with video controls because
-              // Chrome does not propagate any mouse events after controls are clicked.
-              self._move_frame_to_front(this.closest(".image-frame"));
             }
             else
             {
               self.syncing_videos.splice(index, 1);
             }
           })
-          .on("play", function(event){
-            // console.log("onplay");
+          .on("play", function(){
             pinVideo(self, this, image);
-
-            var playing_index = self.playing_videos.indexOf(image.index);
-            // If video was directly played by user
-            if(playing_index < 0)
-            {
-              // Need to explicitly move the frame to the front when interacting with video controls because
-              // Chrome does not propagate any mouse events after controls are clicked.
-              self._move_frame_to_front(this.closest(".image-frame"));
-            }
-            // Do nothing if video was played by system, just remove it from the played videos list
-            else
-            {
-              self.playing_videos.splice(playing_index, 1);
-            }
-          })
-          .on("volumechange", function(event){
-            // Need to explicitly move the frame to the front when interacting with video controls because
-            // Chrome does not propagate any mouse events after controls are clicked.
-            self._move_frame_to_front(this.closest(".image-frame"));
           })
           ;
         if(image.currentTime != undefined && image.currentTime > 0)
         {
-          self.syncing_videos.push(image.index);
           video.property("currentTime", image.currentTime);
         }
 
@@ -2116,17 +2064,10 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       // but probably what it's doing is thinking that since the element moved, there's no mouseup or click event fired after mousedown.
       // I didn't test for mouseup, but tested moving an element on mousedown and following click events were never fired or propagated.
       // frame.insertAfter($("div.image-frame:last-child"));
-      // frame.detach().appendTo(self.media_layer.node());
-      // November 2017, Alex stopped using frame.detach().appendTo() because of the above documented issues. Instead I switched to
-      // using z-index for a cleaner implementation that works better with event handlers.
-
-      // Increment highest_z_index and assign it to the current frame
-      self.options.highest_z_index++;
-      frame.css("z-index", self.options.highest_z_index);
-
+      frame.detach().appendTo(self.media_layer.node());
+      self.current_frame = null;
       $(".open-image").removeClass("selected");
       frame.addClass("selected");
-
       self.current_frame = Number(frame.data("index"));
       self._sync_open_images();
     }
@@ -2348,7 +2289,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
     {
       $(".open-image video").each(function(index, video)
       {
-        self.playing_videos.push($(video.parentElement).data('index'));
         video.play();
       });
     }
@@ -2357,7 +2297,6 @@ define("slycat-parameter-image-scatterplot", ["slycat-server-root", "d3", "URI",
       var video = $(".open-image[data-index='" + self.current_frame + "'] video").get(0);
       if(video != null)
       {
-        self.playing_videos.push($(video.parentElement).data('index'));
         video.play();
       }
     }

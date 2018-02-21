@@ -158,8 +158,6 @@ def start(root_path, config_file):
   dispatcher.connect("delete-job", "/remotes/delete-job/:hostname/:jid", slycat.web.server.handlers.delete_job, conditions={ "method": ["DELETE"] })
   dispatcher.connect("get-job-output", "/remotes/get-job-output/:hostname/:jid/path{path:.*}", slycat.web.server.handlers.get_job_output, conditions={ "method": ["POST"] })
   dispatcher.connect("post-agent-function", "/remotes/:hostname/run-agent-function", slycat.web.server.handlers.run_agent_function, conditions={ "method": ["POST"] })
-  dispatcher.connect("post-remote-command", "/remotes/:hostname/post-remote-command", slycat.web.server.handlers.post_remote_command, conditions={ "method": ["POST"] })
-  dispatcher.connect("get-job-session-status", "/remotes/:hostname/:jid/get-remote-job-status", slycat.web.server.handlers.get_remote_job_status, conditions={"method": ["GET"]})
 
   dispatcher.connect("get-user-config", "/remotes/:hostname/get-user-config", slycat.web.server.handlers.get_user_config, conditions={ "method": ["GET"] })
   dispatcher.connect("get-runtime", "/remotes/:nodes/:tasks/:size/job-time", slycat.web.server.handlers.job_time, conditions={ "method": ["GET"] })

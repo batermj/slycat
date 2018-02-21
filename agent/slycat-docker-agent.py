@@ -6,6 +6,12 @@
 # Export of this program may require a
 # license from the United States Government.
 
+# External dependencies
+import PIL.Image
+
+# Python standard library
+import argparse
+
 try:
     import cStringIO as StringIO
 except ImportError:
@@ -18,143 +24,35 @@ import sys
 import tempfile
 import agent
 import threading
-import traceback
-import logging
-import random
+
+
 class Agent(agent.Agent):
     """
 
     """
 
-    def __init__(self):
-        """
-        add the list of scripts we want to be able to call
-        """
-        agent.Agent.__init__(self)
-    def get_hpc_run_string(self, command):
-        pass
     def run_remote_command(self, command):
-        command = command["command"]
-        run_command = None
-        # get the command scripts that were sent to the agent
-        for command_script in command["scripts"]:
-            # compare the payload commands to the registered commands on the agent
-            run_command = self.get_script_run_string(command_script)
-        if run_command is None or run_command == "":
-            results = {"ok": False, "message": "could not create a run command did you register your script with "
-                                               "slycat?"}
-            sys.stdout.write("%s\n" % json.dumps(results))
-            sys.stdout.flush()
-            return
-        command["run_command"] = run_command
-        # if "background_task" in command and command["background_task"]:
-        output = ["running task in background", "running task in background"]
-        jid = random.randint(10000000, 99999999)
-        run_command += " --log_file " + str(jid) + ".log"
-        if command["hpc"]["is_hpc_job"]:
-            output = ["running batch job", "running batch job"]
-            _string = ""
-            for _ in command["hpc"]["parameters"]:
-                _string = str(_.keys()[0]) + str(_[_.keys()[0]]) + _string
-            output = [_string, _string]
-        else:
-            try:
-                background_thread = threading.Thread(target=self.run_shell_command, args=(run_command, jid, True,))
-                background_thread.start()
-            except Exception as e:
-                output[0] = traceback.format_exc()
-        # else:
-        #     output = self.run_shell_command(run_command)
-        results = {
-            "message": "ran the remote command",
-            "ok": True,
-            "jid": jid,
-            "command": command,
-            "output": output[0],
-            "errors": output[1],
-            "available_scripts": [
-                {
-                    "name": script["name"],
-                    "description": script["description"],
-                    "parameters": script["parameters"]
-                }
-                for script in self.scripts]
-        }
-        sys.stdout.write("%s\n" % json.dumps(results))
-        sys.stdout.flush()
-
-    def run_shell_command(self, command, jid=0, log_to_file=False):
-        # create log file in the users directory for later polling
-        if log_to_file:
-            log = self.create_job_logger(jid)
-        try:
-            if log_to_file:
-                log("[STARTED]")
-            command = command.split(' ')
-
-            # remove empty list values
-            for _ in command:
-                if _ == "":
-                    command.remove("")
-            # open process to run script
-            p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if log_to_file:
-                log("[RUNNING]")
-            # execute script
-            value = p.communicate()
-            if log_to_file:
-                log(str(value))
-                log("[FINISHED]")
-                return value
-            else:
-                return value
-        except Exception as e:
-            log("[FAILED]")
-            return ["FAILED", "FAILED"]
-            # print traceback.format_exc()
-
-    def check_agent_job(self, command):
-        results = {
-            "ok": True,
-            "jid": command["command"]["jid"],
-            "status": "[UNKNOWN]",
-            "status_list": self._status_list
-        }
-        try:
-            with open(str(command["command"]["jid"])+'.log') as log_file:
-                for line in log_file:
-                    if line.strip(' \t\n\r') in self._status_list:
-                        results["status"] = line.strip(' \t\n\r')
-        except IOError:
-            sys.stdout.write("%s\n" % json.dumps({"ok": False, "message": "file not found: job id log file is "
-                                                                          "probably missung"}))
-            sys.stdout.flush()
-        except Exception as e:
-            self.log.log(logging.INFO, traceback.format_exc())
-            sys.stdout.write("%s\n" % json.dumps({"ok": False, "message": e}))
-            sys.stdout.flush()
-        sys.stdout.write("%s\n" % json.dumps(results))
-        sys.stdout.flush()
+        command = command.split(' ')
+        p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return p.communicate()
 
     def launch(self, command):
-        output = self.run_shell_command(command["command"])
+        output = self.run_remote_command(command["command"])
         results = {
             "ok": True,
             "command": command["command"],
             "output": output[0],
-            "errors": output[1]
-        }
+            "errors": output[1]}
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
     def submit_batch(self, command):
-        output = self.run_shell_command(command["command"])
+        output = self.run_remote_command(command["command"])
         results = {
             "ok": True,
             "filename": command["command"],
             "output": output[0],
-            "errors": output[1]
-        }
+            "errors": output[1]}
         sys.stdout.write("%s\n" % json.dumps(results))
         sys.stdout.flush()
 
@@ -173,7 +71,7 @@ class Agent(agent.Agent):
         sys.stdout.flush()
 
     def cancel_job(self, command):
-        output = self.run_shell_command("scancel %s" % command["command"])  # command is jid here
+        output = self.run_remote_command("scancel %s" % command["command"]) # command is jid here
         results = {
             "ok": True,
             "jid": command["command"],
@@ -192,7 +90,7 @@ class Agent(agent.Agent):
         path = command["command"]["path"]
         f = path + "slurm-%s.out" % results["jid"]
         if os.path.isfile(f):
-            results["output"], results["errors"] = self.run_shell_command("cat %s" % f)
+            results["output"], results["errors"] = self.run_remote_command("cat %s" % f)
         else:
             results["output"] = "see errors"
             results["errors"] = "the file %s does not exist." % f
@@ -229,14 +127,6 @@ class Agent(agent.Agent):
         # f.write("pkill -f python \n")
         f.close()
 
-    def remote_command(self, command):
-        """
-        command to be run on the remote machine
-        :param command: json command
-        :return: 
-        """
-        pass
-
     def run_function(self, command):
         results = {
             "ok": True,
@@ -255,7 +145,7 @@ class Agent(agent.Agent):
         # uid = command["command"]["uid"]
         working_dir = command["command"]["working_dir"]
         try:
-            self.run_shell_command("mkdir -p %s" % working_dir)
+            self.run_remote_command("mkdir -p %s" % working_dir)
         except Exception:
             pass
         tmp_file = tempfile.NamedTemporaryFile(delete=False, dir=working_dir)
@@ -265,14 +155,14 @@ class Agent(agent.Agent):
         with open(tmp_file.name, 'r') as myfile:
             data = myfile.read().replace('\n', '')
         results["temp_file"] = data
-        self.run_shell_command("chmod 755 %s" % tmp_file.name)
+        self.run_remote_command("chmod 755 %s" % tmp_file.name)
         # print "starting"
         # print tmp_file.name
         try:
             # print (".%s &> /dev/null" % tmp_file.name)
-            # p = Process(target=self.run_shell_command, args=(("sh %s >> outfile.txt" % tmp_file.name),))
+            # p = Process(target=self.run_remote_command, args=(("sh %s >> outfile.txt" % tmp_file.name),))
             # p.start()
-            t = threading.Thread(target=self.run_shell_command, args=("sh %s &>/dev/null &; disown" % tmp_file.name,))
+            t = threading.Thread(target=self.run_remote_command, args=("sh %s &>/dev/null &; disown" % tmp_file.name,))
             t.start()
             results["working_dir"] = working_dir
             results["errors"] = None
