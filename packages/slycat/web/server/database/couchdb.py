@@ -17,7 +17,6 @@ import time
 import uuid
 import slycat.email
 
-db_lock = threading.Lock()
 class Database:
   """Wraps a :class:`couchdb.client.Database` to convert CouchDB exceptions into CherryPy exceptions."""
   def __init__(self, database):
