@@ -194,12 +194,7 @@ define(["slycat-server-root", "slycat-web-client", "slycat-dialog", "slycat-mark
         mid: component.model._id(),
         success: function()
         {
-          client.post_model_finish({
-            mid: component.model._id(),
-            success: function() {
-              console.log("Successfully added file name to the model.");
-            }
-          });
+            console.log("Successfully added file name to the model.");
         },
         error: dialog.ajax_error("Error updating model."),
       });
