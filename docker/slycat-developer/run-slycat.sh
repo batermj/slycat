@@ -26,7 +26,7 @@ do
 	/home/slycat/install/conda/bin/python /home/slycat/src/slycat/web-server/slycat-couchdb-setup.py
 	service slycat-web-server start
 	service haproxy start
-	service sshd start
+	service sshd start		
   fi
 
   service slycat-web-server status
