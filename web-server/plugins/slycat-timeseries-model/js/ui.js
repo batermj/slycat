@@ -130,7 +130,7 @@ function doPoll() {
       if(!model.hasOwnProperty("artifact:image-columns"))
       {
         // Find media columns
-        console.log("This model has no artifact:image-columns");
+        // console.log("This model has no artifact:image-columns");
         client.get_model_command({
           mid: model._id,
           type: "timeseries",
